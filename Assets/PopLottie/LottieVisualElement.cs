@@ -156,6 +156,9 @@ namespace PopLottie
 
             Debug.Log($"Rebuilding animation of {this.name}({this.animatedImageResourceUrl})...");
 
+            if ( _lottieAnimation == null )
+            return;
+
             try
             {
                 //_lottieAnimation = new PopLottie.Animation();

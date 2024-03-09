@@ -4,6 +4,12 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
+//	we need to dynamically change the structure as we parse, so the built in json parser wont cut it
+//	com.unity.nuget.newtonsoft-json
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Object = UnityEngine.Object;
+
 
 //  this is actually the bodymovin spec
 namespace PopLottie
@@ -33,11 +39,11 @@ namespace PopLottie
 		//	animated
 		//public KeyframeFloats[]	k;	//	frames
 		//	non animated
-		public float[]		k;	//	frames
+		//public float[]		k;	//	frames
 		
 		public float			GetValue(float Time)
 		{
-			return k[0];
+			return 0;
 		}
 	}
 
@@ -45,9 +51,96 @@ namespace PopLottie
 	[Serializable] public struct Keyframe2
 	{
 		public Vector2		i;
+		public Vector2		o;
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value
+	}
+	
+	[Serializable] public struct Float2
+	{
+		public float[]		x;
+		public float[]		y;
+	}
+
+	
+	
+	//	make this generic too
+	[Serializable] public struct Frame_Vector2
+	{
+		public Float2		i;
+		public Float2		o;
+		public float		t;	//	time
+		public float[]		s;	//	start value
+		public float[]		e;	//	end value
+	}
+	
+	
+	class Keyframed_Vector2Convertor : JsonConverter<Keyframed_Vector2>
+	{
+		public override void WriteJson(JsonWriter writer, Keyframed_Vector2 value, JsonSerializer serializer)
+		{
+			throw new NotImplementedException();
+		}
+
+		public override Keyframed_Vector2 ReadJson(JsonReader reader, Type objectType, Keyframed_Vector2 existingValue, bool hasExistingValue,JsonSerializer serializer)
+		{
+			existingValue = new Keyframed_Vector2();
+			existingValue.Frames = new();
+			if ( reader.TokenType == JsonToken.StartObject )
+			{
+				//var FrameObject = JObject.Load(reader);
+				//var SingleFrame = new Frame_Vector2(FrameObject);
+				var Serializer = new JsonSerializer();
+				var SingleFrame = Serializer.Deserialize<Frame_Vector2>(reader);
+				existingValue.Frames.Add(SingleFrame);
+			}
+			else if ( reader.TokenType == JsonToken.StartArray )
+			{
+				var ThisArray = JArray.Load(reader);
+				foreach ( var Frame in ThisArray )
+				{
+					var FrameReader = new JTokenReader(Frame);
+					var Serializer = new JsonSerializer();
+					var SingleFrame = Serializer.Deserialize<Frame_Vector2>(FrameReader);
+					//var FrameObject = JObject.Load(Frame);
+					//var SingleFrame = new Frame_Vector2(FrameObject);
+					existingValue.Frames.Add(SingleFrame);
+				}
+			}
+			else 
+			{
+				//existingValue.ReadAnimatedOrNotAnimated(reader);
+				Debug.LogWarning($"Decoding Keyframed_Vector2 unhandled token type {reader.TokenType}");
+			}
+			/*
+			//	normally this is .k
+			//	it's either a list of vec2 if static
+			//	or its a keyframe'd object
+			JObject Obj = JObject.Load(reader);
+			//	read standard members first (can we automate this?)
+			foreach (var Member in Obj)
+			{
+				if ( Member.Key == "a" )
+				{
+					var value = Member.Value;
+					existingValue.a = (Int32)value;
+				}
+			}
+			/*
+			//public float[]		k;	//	frames
+			public float[]		k_Animated;	//	frames
+			public Keyframe2[]	k_Static;	//	frames
+			*/
+			return existingValue;
+		}
+
+	}
+	
+	//	make this generic
+	public struct Keyframed_Vector2
+	{
+		public List<Frame_Vector2>	Frames;
 	}
 	
 	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/
@@ -55,13 +148,18 @@ namespace PopLottie
 	{
 		public int			a;
 		public bool			Animated => a!=0;
-		public float[]		k;	//	frames
+		
+		[JsonConverter(typeof(Keyframed_Vector2Convertor))]
+		public Keyframed_Vector2	k;	//	frames
 		
 		public float		GetValue(double Time)
 		{
+			return 0;
+			/*
 			if ( k.Length < 1 )
 				return 0;
 			return k[0];
+			*/
 		}
 	}
 
@@ -135,10 +233,11 @@ namespace PopLottie
 		public float	sk;	//	skew angle degrees
 		public float	sa;	//	Direction at which skew is applied, in degrees (0 skews along the X axis, 90 along the Y axis)
 		*/
-		public AnimatedVector	s;	//	scale factor, 100=no scaling
-		public AnimatedPosition	a;	//	anchor point
-		public AnimatedPosition	p;	//	position/translation
-		public AnimatedNumber	r;	//	rotation in degrees clockwise
+		//public AnimatedVector	s;	//	scale factor, 100=no scaling
+		//public AnimatedPosition	a;	//	anchor point
+		//public AnimatedPosition	p;	//	position/translation
+		//public AnimatedNumber	r;	//	rotation in degrees clockwise
+		//[JsonConverter(typeof(AnimatedNumberConvertor))]
 		public AnimatedNumber	o;	//	opacity 0...100
 	}
 	
@@ -152,9 +251,49 @@ namespace PopLottie
 		Ellipse,
 	}
 	
+	public class ShapeSpecificMeta
+	{
+	}
+
+	
+	class AnimatedNumberConvertor : JsonConverter<AnimatedNumber>
+	{
+		public override void WriteJson(JsonWriter writer, AnimatedNumber value, JsonSerializer serializer)
+		{
+			throw new NotImplementedException();
+		}
+
+		public override AnimatedNumber ReadJson(JsonReader reader, Type objectType, AnimatedNumber existingValue, bool hasExistingValue,
+			JsonSerializer serializer)
+		{
+			//	normally this is .k
+			//	it's either a list of vec2 if static
+			//	or its a keyframe'd object
+			JObject Obj = JObject.Load(reader);
+			//	read standard members first (can we automate this?)
+			foreach (var Member in Obj)
+			{
+				if ( Member.Key == "a" )
+				{
+					var value = Member.Value;
+					existingValue.a = (Int32)value;
+				}
+			}
+			/*
+			//public float[]		k;	//	frames
+			public float[]		k_Animated;	//	frames
+			public Keyframe2[]	k_Static;	//	frames
+			*/
+			return existingValue;
+		}
+
+	}
 	
 	[Serializable] public struct Shape
 	{
+		//[JsonConverter(typeof(ShapeConvertor))]
+		//public ShapeSpecificMeta	ShapeMeta;
+	
 		//	path
 		public AnimatedBezier	ks;	//	bezier for path
 		public AnimatedBezier	Path_Bezier => ks;
@@ -163,7 +302,7 @@ namespace PopLottie
 		public AnimatedColour	c;	//	colour
 		public AnimatedColour	Fill_Colour => c;
 		public AnimatedColour	Stroke_Colour => c;
-		public int				r;	//	fill rule
+		//public int				r;	//	fill rule
 		public AnimatedNumber	o;	//	opacity? 
 		public AnimatedNumber	w;	//	width
 		public AnimatedNumber	Stroke_Width => w;
@@ -188,8 +327,8 @@ namespace PopLottie
 		public String		Name => nm ?? "Unnamed";
 		public String		mn;
 		public String		MatchName => mn;
-		public int			hd;
-		public bool			Hidden => hd == 1;
+		public bool			hd;	//	i think sometimes this might an int. Newtonsoft is very strict with types
+		public bool			Hidden => hd;
 		public bool			Visible => !Hidden;
 		public String		ty;	
 		public ShapeType	Type => ty switch
@@ -289,7 +428,19 @@ namespace PopLottie
 		
 		public Animation(string FileContents)
 		{
-			lottie = JsonUtility.FromJson<Root>(FileContents);
+			//	gr: can't use built in, as the structure changes depending on contents, and end up with clashing types
+			//lottie = JsonUtility.FromJson<Root>(FileContents);
+			//	can't use the default deserialiser, because for some reason, the parser misses out parsing
+			//	[ {}, {} ] 
+			//lottie = Newtonsoft.Json.JsonConvert.DeserializeObject<Root>(FileContents);
+			
+			//	we CAN parse with generic parser!
+			var Parsed = JObject.Parse(FileContents);
+			
+			JsonSerializer serializer = new JsonSerializer();
+			
+			
+			lottie = (Root)serializer.Deserialize(new JTokenReader(Parsed), typeof(Root));
 		}
 		
 		public int CurrentFrame = 0;
@@ -426,7 +577,7 @@ namespace PopLottie
 			Painter.Stroke();
 			*/
 			
-			Debug.Log($"Paths {PathsDrawn} Ellipses {EllipsesDrawn}");
+			//Debug.Log($"Paths {PathsDrawn} Ellipses {EllipsesDrawn}");
 		}
 		
 	}

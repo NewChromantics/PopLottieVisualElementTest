@@ -21,6 +21,21 @@ namespace PopLottie
 	{
 	}
 	
+	[Serializable] public struct Frame_Floats
+	{
+		public float[]		k;
+		public Float2		o;
+		public float		t;	//	time
+		public float[]		s;	//	start value
+		public float[]		e;	//	end value
+	}
+	
+	public struct Keyframed_Floats
+	{
+		public int					a;
+		public int					ix;
+		public List<Frame_Floats>	Frames;
+	}
 	
 	[Serializable] public struct KeyframeFloats
 	{
@@ -36,10 +51,9 @@ namespace PopLottie
 		public int				a;
 		public bool				Animated => a!=0;
 		
-		//	animated
-		//public KeyframeFloats[]	k;	//	frames
-		//	non animated
-		//public float[]		k;	//	frames
+		//[JsonConverter(typeof(Keyframed_FloatsConvertor))]
+		//public Keyframed_Floats	k;	//	frames
+		public float[]			k;
 		
 		public float			GetValue(float Time)
 		{
@@ -89,8 +103,6 @@ namespace PopLottie
 			existingValue.Frames = new();
 			if ( reader.TokenType == JsonToken.StartObject )
 			{
-				//var FrameObject = JObject.Load(reader);
-				//var SingleFrame = new Frame_Vector2(FrameObject);
 				var Serializer = new JsonSerializer();
 				var SingleFrame = Serializer.Deserialize<Frame_Vector2>(reader);
 				existingValue.Frames.Add(SingleFrame);
@@ -113,33 +125,17 @@ namespace PopLottie
 				//existingValue.ReadAnimatedOrNotAnimated(reader);
 				Debug.LogWarning($"Decoding Keyframed_Vector2 unhandled token type {reader.TokenType}");
 			}
-			/*
-			//	normally this is .k
-			//	it's either a list of vec2 if static
-			//	or its a keyframe'd object
-			JObject Obj = JObject.Load(reader);
-			//	read standard members first (can we automate this?)
-			foreach (var Member in Obj)
-			{
-				if ( Member.Key == "a" )
-				{
-					var value = Member.Value;
-					existingValue.a = (Int32)value;
-				}
-			}
-			/*
-			//public float[]		k;	//	frames
-			public float[]		k_Animated;	//	frames
-			public Keyframe2[]	k_Static;	//	frames
-			*/
 			return existingValue;
 		}
 
 	}
 	
 	//	make this generic
+	[JsonConverter(typeof(Keyframed_Vector2Convertor))]
 	public struct Keyframed_Vector2
 	{
+		public int					a;
+		public int					ix;
 		public List<Frame_Vector2>	Frames;
 	}
 	
@@ -149,7 +145,6 @@ namespace PopLottie
 		public int			a;
 		public bool			Animated => a!=0;
 		
-		[JsonConverter(typeof(Keyframed_Vector2Convertor))]
 		public Keyframed_Vector2	k;	//	frames
 		
 		public float		GetValue(double Time)
@@ -255,69 +250,66 @@ namespace PopLottie
 	{
 	}
 
-	
-	class AnimatedNumberConvertor : JsonConverter<AnimatedNumber>
+	public class ShapeConvertor : JsonConverter<Shape>
 	{
-		public override void WriteJson(JsonWriter writer, AnimatedNumber value, JsonSerializer serializer)
+		public override void WriteJson(JsonWriter writer, Shape value, JsonSerializer serializer)
 		{
 			throw new NotImplementedException();
 		}
-
-		public override AnimatedNumber ReadJson(JsonReader reader, Type objectType, AnimatedNumber existingValue, bool hasExistingValue,
-			JsonSerializer serializer)
+		
+		public override Shape ReadJson(JsonReader reader, Type objectType, Shape existingValue, bool hasExistingValue, JsonSerializer serializer)
 		{
-			//	normally this is .k
-			//	it's either a list of vec2 if static
-			//	or its a keyframe'd object
-			JObject Obj = JObject.Load(reader);
-			//	read standard members first (can we automate this?)
-			foreach (var Member in Obj)
+			var Serializer = new JsonSerializer();
+			
+			var ShapeObject = JObject.Load(reader);
+			var ReReader = new JTokenReader( ShapeObject );
+			
+			//	gr: can we re-read?
+			//var ShapeBase = Serializer.Deserialize<ShapeBase>(reader);
+			var ShapeBase = new ShapeBase();
+			ShapeBase.ty = ShapeObject["ty"].Value<String>();
+			
+			//	now based on type, serialise
+			if ( ShapeBase.Type == ShapeType.Ellipse )
 			{
-				if ( Member.Key == "a" )
-				{
-					var value = Member.Value;
-					existingValue.a = (Int32)value;
-				}
+				ShapeBase = Serializer.Deserialize<ShapeEllipse>(reader);
 			}
-			/*
-			//public float[]		k;	//	frames
-			public float[]		k_Animated;	//	frames
-			public Keyframe2[]	k_Static;	//	frames
-			*/
+			else if ( ShapeBase.Type == ShapeType.Fill )
+			{
+				ShapeBase = Serializer.Deserialize<ShapeFillAndStroke>(reader);
+			}
+			else if ( ShapeBase.Type == ShapeType.Stroke )
+			{
+				ShapeBase = Serializer.Deserialize<ShapeFillAndStroke>(reader);
+			}
+			else if ( ShapeBase.Type == ShapeType.Transform )
+			{
+				ShapeBase = Serializer.Deserialize<ShapeTransform>(reader);
+			}
+			else if ( ShapeBase.Type == ShapeType.Group )
+			{
+				ShapeBase = Serializer.Deserialize<ShapeGroup>(reader);
+			}
+			else if ( ShapeBase.Type == ShapeType.Path )
+			{
+				ShapeBase = Serializer.Deserialize<ShapePath>(reader);
+			}
+
+			existingValue.TheShape = ShapeBase;
 			return existingValue;
 		}
-
 	}
-	
-	[Serializable] public struct Shape
+
+	[JsonConverter(typeof(ShapeConvertor))]
+	[Serializable] public class Shape
 	{
-		//[JsonConverter(typeof(ShapeConvertor))]
-		//public ShapeSpecificMeta	ShapeMeta;
-	
-		//	path
-		public AnimatedBezier	ks;	//	bezier for path
-		public AnimatedBezier	Path_Bezier => ks;
-		
-		//	fill & stroke
-		public AnimatedColour	c;	//	colour
-		public AnimatedColour	Fill_Colour => c;
-		public AnimatedColour	Stroke_Colour => c;
-		//public int				r;	//	fill rule
-		public AnimatedNumber	o;	//	opacity? 
-		public AnimatedNumber	w;	//	width
-		public AnimatedNumber	Stroke_Width => w;
-	
-		//	ellipse
-		public AnimatedVector	s;	//	
-		public AnimatedVector	Ellipse_Size => s;	
-		public AnimatedPosition	Ellipse_Center => p;	
-	
-		//	transform
-		public AnimatedPosition	p;	//	translation
-		public AnimatedPosition	a;	//	anchor
-		//public AnimatedVector	s;	//	scale
-		//public AnimatedVector	r;	//	rotation
-	
+		public ShapeType	Type => TheShape.Type;
+		public ShapeBase	TheShape;
+	}
+
+
+	[Serializable] public class ShapeBase 
+	{
 		public int			ind;//	?
 		public int			np;		//	number of properties
 		public int			cix;	//	property index
@@ -341,9 +333,53 @@ namespace PopLottie
 			"el" => ShapeType.Ellipse,
 			_ => throw new Exception($"Unknown type {ty}")
 		};
+	}
+	
+	[Serializable] public class ShapePath : ShapeBase
+	{
+		public AnimatedBezier	ks;	//	bezier for path
+		public AnimatedBezier	Path_Bezier => ks;
+	}
+		
+				
+	[Serializable] public class ShapeFillAndStroke : ShapeBase 
+	{
+		public AnimatedColour	c;	//	colour
+		public AnimatedColour	Fill_Colour => c;
+		public AnimatedColour	Stroke_Colour => c;
+		//public int				r;	//	fill rule
+		public AnimatedNumber	o;	//	opacity? 
+		public AnimatedNumber	w;	//	width
+		public AnimatedNumber	Stroke_Width => w;
+	}
+		
+		
+	[Serializable] public class ShapeTransform : ShapeBase 
+	{
+		//	transform
+		public AnimatedPosition	p;	//	translation
+		public AnimatedPosition	a;	//	anchor
+		public AnimatedVector	s;	//	scale
+		public AnimatedVector	r;	//	rotation
+	}
+	
+	
+	[Serializable] public class ShapeEllipse : ShapeBase 
+	{
+		public AnimatedVector	s;
+		public AnimatedPosition	p;
+		public AnimatedVector	Size => s;	
+		public AnimatedPosition	Center => p;	
+		
+	}
+	
+	[Serializable] public class ShapeGroup: ShapeBase 
+	{
 		public Shape[]		it;	//	children
 		public Shape[]		Children => it;
 	}
+	
+
 	
 	[Serializable]
 	public struct LayerMeta	//	shape layer
@@ -481,7 +517,7 @@ namespace PopLottie
 			
 			Painter.fillColor = Color.blue;
 
-			void RenderGroup(Shape Group)
+			void RenderGroup(ShapeGroup Group)
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
@@ -493,20 +529,20 @@ namespace PopLottie
 				
 				foreach ( var Child in Children )
 				{
-					if ( Child.Type == ShapeType.Fill )
+					if ( Child.Type == ShapeType.Fill && Child.TheShape is ShapeFillAndStroke fill )
 					{
-						Painter.fillColor = Child.Fill_Colour.GetColour(Time);
+						Painter.fillColor = fill.Fill_Colour.GetColour(Time);
 						Filled = true;
 					}
-					if ( Child.Type == ShapeType.Stroke )
+					if ( Child.Type == ShapeType.Stroke && Child.TheShape is ShapeFillAndStroke stroke )
 					{
-						Painter.strokeColor = Child.Stroke_Colour.GetColour(Time);
-						Painter.lineWidth = Child.Stroke_Width.GetValue(Time);
+						Painter.strokeColor = stroke.Stroke_Colour.GetColour(Time);
+						Painter.lineWidth = stroke.Stroke_Width.GetValue(Time);
 						Stroked = true;
 					}
-					if ( Child.Type == ShapeType.Path )
+					if ( Child.TheShape is ShapePath path )
 					{
-						var Bezier = Child.Path_Bezier.GetBezier(Time);
+						var Bezier = path.Path_Bezier.GetBezier(Time);
 		
 						Painter.BeginPath();
 						//Painter.Arc(new Vector2(width * 0.3f, height * 0.3f), width * 0.5f, 0.0f, 360.0f);
@@ -515,10 +551,10 @@ namespace PopLottie
 							Painter.ClosePath();
 						PathsDrawn++;
 					}
-					if ( Child.Type == ShapeType.Ellipse )
+					if ( Child.TheShape is ShapeEllipse ellipse )
 					{
-						var EllipseSize = Child.Ellipse_Size.GetValue(Time);
-						var EllipseCenter = Child.Ellipse_Center.GetPosition(Time);
+						var EllipseSize = ellipse.Size.GetValue(Time);
+						var EllipseCenter = ellipse.Center.GetPosition(Time);
 		
 						var Radius = EllipseSize;
 		
@@ -527,7 +563,7 @@ namespace PopLottie
 						Painter.ClosePath();
 						EllipsesDrawn++;
 					}
-					if ( Child.Type == ShapeType.Transform )
+					if ( Child.TheShape is ShapeTransform transform )
 					{
 						//	do transform stuff
 						Transform = Vector3.one;
@@ -552,9 +588,9 @@ namespace PopLottie
 				//	render the shape
 				foreach ( var Shape in Layer.shapes )
 				{
-					if ( Shape.Type == ShapeType.Group )
+					if ( Shape.TheShape is ShapeGroup group )
 					{
-						RenderGroup(Shape);
+						RenderGroup(group);
 					}
 					else
 					{

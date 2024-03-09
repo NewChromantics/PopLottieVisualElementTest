@@ -1,0 +1,4 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="fruit.lottie" animEnabled="true" style="flex-grow: 1; background-color: rgb(224, 45, 189);" />
+    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="fruit.lottie" style="background-color: rgb(195, 93, 8); flex-grow: 1;" />
+</ui:UXML>

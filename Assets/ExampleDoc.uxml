@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
-    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="Fruit.lottie.pretty" animEnabled="false" style="flex-grow: 1; background-color: rgb(224, 45, 189);" />
-    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="studio5logo" animEnabled="true" style="flex-grow: 1; background-color: rgb(224, 45, 189); margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px;" />
-    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="studio5logo" enableDebug="false" style="background-color: rgb(8, 180, 195); flex-grow: 1; margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px;" />
+    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="Fruit.lottie.pretty" animEnabled="false" name="AnimatedImageElement" style="flex-grow: 1; background-color: rgb(224, 45, 189);" />
+    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="studio5logo" animEnabled="true" style="flex-grow: 1; background-color: rgba(224, 45, 189, 0); margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px;" />
+    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="studio5logo" enableDebug="false" style="background-color: rgba(8, 180, 195, 0); flex-grow: 1; margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px; position: absolute; top: 151px; height: 135px; width: 326px; left: 12px;" />
     <PopLottie.LottieVisualElement animEnabled="false" animatedImageResourceUrl="Fruit.lottie.pretty" enableDebug="false" style="background-color: rgb(8, 180, 195); flex-grow: 1;" />
 </ui:UXML>

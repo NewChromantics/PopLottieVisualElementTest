@@ -336,8 +336,6 @@ namespace PopLottie
 	[Serializable] public struct TransformMeta
 	{
 	/*
-		public float[]	a;	//	anchor point
-		public float[]	s;	//	scale factor, 100=no scaling
 		public float	r;	//	rotation in degrees clockwise
 		public float	sk;	//	skew angle degrees
 		public float	sa;	//	Direction at which skew is applied, in degrees (0 skews along the X axis, 90 along the Y axis)

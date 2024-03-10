@@ -348,12 +348,12 @@ namespace PopLottie
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
 		public AnimatedNumber	o;	//	opacity 0...100
 		
-		public Vector2			GetTransform(float Time)
+		public Transformer		GetTransformer(float Time)
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
-			//	anchor only for rot/scale origin
-			return Position;
+			float Scale = 1;
+			return new Transformer(Position,Anchor,Scale);
 		}
 	}
 	
@@ -487,12 +487,12 @@ namespace PopLottie
 		//public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
 		
-		public Vector2	GetTransform(float Time)
+		public Transformer	GetTransformer(float Time)
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
-			//	anchor for scale + rot
-			return Position;
+			var Scale = 1;
+			return new Transformer( Position, Anchor, Scale);
 		}
 	}
 	
@@ -514,7 +514,61 @@ namespace PopLottie
 		public bool		IsStroked => StrokeColour.HasValue;
 		public bool		IsFilled => FillColour.HasValue;
 	}
-	
+
+	//	also for layers, but can't call this Transform
+	public struct Transformer
+	{
+		Vector2?	Scale2;
+		float?		Scale1;
+		
+		Vector2		Translation;
+		Vector2		Anchor;
+		
+		public Transformer(Vector2 Translation,Vector2 Anchor,float Scale)
+		{
+			this.Translation = Translation;
+			this.Anchor = Anchor;
+			Scale1 = Scale;
+			Scale2 = null;
+		}
+		
+		Vector2		GetScale()
+		{
+			if ( Scale2 is Vector2 s2 )
+				return s2;
+			if ( Scale1 is float s1 )
+				return new Vector2(s1,s1);
+			return Vector2.one;
+		} 
+		
+		public Vector2	LocalToWorld(Vector2 LocalPosition)
+		{
+			//	gr: this needs to use anchor
+			LocalPosition -= Anchor;
+			LocalPosition *= GetScale();
+			//	rotate here
+			LocalPosition += Anchor;
+			LocalPosition += Translation;
+			
+			return LocalPosition;
+		}
+		
+		public float	LocalToWorld(float LocalSize)
+		{
+			LocalSize *= GetScale().x;
+			return LocalSize;
+		}
+		
+		//	gr: might all be simpler if we generate a 2D matrix...
+		public Transformer	Multiply(Transformer ChildTransform)
+		{
+			var NewTransform = ChildTransform;
+			NewTransform.Translation += this.Translation;
+			NewTransform.Scale2 = ChildTransform.GetScale() * GetScale();
+			return NewTransform;
+		}
+	}
+
 	[Serializable] public class ShapeGroup: Shape 
 	{
 		public List<ShapeWrapper>		it;	//	children
@@ -530,12 +584,12 @@ namespace PopLottie
 			}
 			return null;
 		}
-		public Vector2		GetTransform(float Time)
+		public Transformer		GetTransformer(float Time)
 		{
 			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
 			if ( Transform == null )
-				return Vector2.zero;
-			return Transform.GetTransform(Time);
+				return new Transformer();
+			return Transform.GetTransformer(Time);
 		}
 		
 		public ShapeStyle		GetShapeStyle(float Time)
@@ -709,29 +763,20 @@ namespace PopLottie
 			
 			Painter.fillColor = Color.blue;
 
-			void RenderGroup(ShapeGroup Group,Vector2 LayerTransform)
+			void RenderGroup(ShapeGroup Group,Transformer LayerTransform)
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
 				
 				//	gr: elements may be in the wrong order
-				var GroupTransform = Group.GetTransform(Time) + LayerTransform;
+				var GroupTransform = Group.GetTransformer(Time).Multiply(LayerTransform);
 				var GroupStyle = Group.GetShapeStyle(Time);
-				
-				float GroupScale = 3;
-				Vector2 LocalToWorld(Vector2 ShapeLocalPosition)
-				{
-					return (ShapeLocalPosition*GroupScale) + GroupTransform;
-				}
-				float LocalScaleToWorld(float ShapeLocalScale)
-				{
-					return ShapeLocalScale * GroupScale;
-				}
+	
 				
 				void ApplyStyle()
 				{
 					Painter.fillColor = GroupStyle.FillColour ?? Color.green;
-					Painter.lineWidth = LocalScaleToWorld( GroupStyle.StrokeWidth ?? 1 );
+					Painter.lineWidth = GroupTransform.LocalToWorld( GroupStyle.StrokeWidth ?? 1 );
 					Painter.strokeColor = GroupStyle.StrokeColour ?? Color.yellow;
 					if ( GroupStyle.IsStroked || EnableDebug )
 						Painter.Stroke();
@@ -753,9 +798,9 @@ namespace PopLottie
 						Painter.BeginPath();
 						void CurveToPoint(Bezier.ControlPoint Point)
 						{
-							var VertexPosition = LocalToWorld(Point.Position);
-							var ControlPoint0 = LocalToWorld(Point.Position + Point.InTangent);
-							var ControlPoint1 = LocalToWorld(Point.Position + Point.OutTangent);
+							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
+							var ControlPoint0 = GroupTransform.LocalToWorld(Point.Position + Point.InTangent);
+							var ControlPoint1 = GroupTransform.LocalToWorld(Point.Position + Point.OutTangent);
 							Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
 							//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
 							//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
@@ -767,7 +812,7 @@ namespace PopLottie
 						for ( var p=0;	p<Points.Length;	p++ )
 						{
 							var Point = Points[p];
-							var VertexPosition = LocalToWorld(Point.Position);
+							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
 							//	skipping first one gives a more solid result, so wondering if
 							//	we need to be doing a mix of p and p+1...
 							if ( p==0 )
@@ -787,9 +832,9 @@ namespace PopLottie
 						{
 							foreach ( var Point in Points )
 							{
-								var VertexPosition = LocalToWorld(Point.Position);
-								var ControlPoint0 = LocalToWorld(Point.Position + Point.InTangent);
-								var ControlPoint1 = LocalToWorld(Point.Position + Point.OutTangent);
+								var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
+								var ControlPoint0 = GroupTransform.LocalToWorld(Point.Position + Point.InTangent);
+								var ControlPoint1 = GroupTransform.LocalToWorld(Point.Position + Point.OutTangent);
 								Painter.lineWidth = 0.4f;
 								Painter.strokeColor = Color.red;
 								Painter.BeginPath();
@@ -820,8 +865,8 @@ namespace PopLottie
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
-						var EllipseSize = LocalScaleToWorld( ellipse.Size.GetValue(Time) );
-						var EllipseCenter = LocalToWorld( ellipse.Center.GetPosition(Time) );
+						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Time) );
+						var EllipseCenter = GroupTransform.LocalToWorld( ellipse.Center.GetPosition(Time) );
 		
 						var Radius = EllipseSize;
 		
@@ -844,7 +889,7 @@ namespace PopLottie
 				if ( !Layer.IsVisible(Time) )
 					continue;
 				
-				var LayerTransform = Layer.Transform.GetTransform(Time);
+				var LayerTransform = Layer.Transform.GetTransformer(Time);
 				
 				//	render the shape
 				foreach ( var Shape in Layer.Children )

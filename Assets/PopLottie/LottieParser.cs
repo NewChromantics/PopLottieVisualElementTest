@@ -9,6 +9,7 @@ using UnityEngine.UIElements;
 //	com.unity.nuget.newtonsoft-json
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Unity.VisualScripting;
 using Object = UnityEngine.Object;
 
 
@@ -22,26 +23,63 @@ namespace PopLottie
 	{
 	}
 	
-	[Serializable] public struct Frame_Floats
-	{
-		public float[]		k;
-		public Float2		o;
-		public float		t;	//	time
-		public float[]		s;	//	start value
-		public float[]		e;	//	end value
 	
+	//	sometimes this is an AnimCurve (x/y graph)
+	//	somtimes it's just a number? or an array of numbers 
+	class ValueCurveConvertor : JsonConverter<ValueCurve>
+	{
+		public override void WriteJson(JsonWriter writer, ValueCurve value, JsonSerializer serializer) { throw new NotImplementedException(); }
+		public override ValueCurve ReadJson(JsonReader reader, Type objectType, ValueCurve existingValue, bool hasExistingValue,JsonSerializer serializer)
+		{
+			if ( reader.TokenType == JsonToken.StartObject )
+			{
+				var ThisObject = JObject.Load(reader);
+				var SingleFrame = ThisObject.ToObject<ValueCurveData>(serializer);
+				existingValue.data = SingleFrame;
+			}
+			else if ( reader.TokenType == JsonToken.StartArray )
+			{
+				var ThisArray = JArray.Load(reader);
+				foreach ( var Frame in ThisArray )
+				{
+					throw new Exception("todo handle an array of values");
+				}
+			}
+			else 
+			{
+				//existingValue.ReadAnimatedOrNotAnimated(reader);
+				Debug.LogWarning($"Decoding ValueCurveConvertor unhandled token type {reader.TokenType}");
+			}
+			return existingValue;
+		}
 	}
 	
-	public struct Keyframed_Floats
+
+	[Serializable]
+	public struct ValueCurveData
 	{
-		public int					a;
-		public int					ix;
-		public List<Frame_Floats>	Frames;
+		public float[]	x;	//	time X axis
+		public float[]	y;	//	value Y axis
+	}
+	
+	[JsonConverter(typeof(ValueCurveConvertor))]
+	[Serializable]
+	public struct ValueCurve
+	{
+		public ValueCurveData	data;
+		public float[]	x => data.x;
+		public float[]	y => data.y;
+		
+		public float	GetValue(TimeSpan NormalisedTime)
+		{
+			return y[0];
+		}
 	}
 	
 	[Serializable] public struct KeyframeFloats
 	{
-		public float[]		i;
+		public ValueCurve	i;
+		public ValueCurve	o;
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value
@@ -53,15 +91,11 @@ namespace PopLottie
 		public int				a;
 		public bool				Animated => a!=0;
 		
-		//[JsonConverter(typeof(Keyframed_FloatsConvertor))]
-		//public Keyframed_Floats	k;	//	frames
-		public float[]			k;
+		public Keyframed_FloatArray	k;	//	frames
 		
 		public float			GetValue(TimeSpan Time)
 		{
-			if ( k.Length == 0 )
-				return 123;
-			return k[0];
+			return k.GetValue(Time);
 		}
 	}
 
@@ -97,13 +131,29 @@ namespace PopLottie
 	
 	[Serializable] public struct Frame_Float
 	{
-		public float		i;
-		public float		o;
+		public ValueCurve	i;
+		public ValueCurve	o;
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value
 		
-		public float		Value => i;
+		public float		GetValue(TimeSpan Time)
+		{
+			return i.GetValue(Time);
+		}
+	}
+	[Serializable] public struct Frame_FloatArray
+	{
+		public ValueCurve	i;
+		public ValueCurve	o;
+		public float		t;	//	time
+		public float[]		s;	//	start value
+		public float[]		e;	//	end value
+		
+		public float		GetValue(TimeSpan Time)
+		{
+			return i.GetValue(Time);
+		}
 	}
 	
 	
@@ -140,24 +190,17 @@ namespace PopLottie
 			}
 			return existingValue;
 		}
-
-
 	}
 	
-	class Keyframed_FloatConvertor : JsonConverter<Keyframed_Float>
+	class KeyframedConvertor<KeyFramedType,FrameType> : JsonConverter<KeyFramedType> where KeyFramedType : IKeyframed<FrameType>
 	{
-		public override void WriteJson(JsonWriter writer, Keyframed_Float value, JsonSerializer serializer)
-		{
-			throw new NotImplementedException();
-		}
-
-		public override Keyframed_Float ReadJson(JsonReader reader, Type objectType, Keyframed_Float existingValue, bool hasExistingValue,JsonSerializer serializer)
+		public override void WriteJson(JsonWriter writer, KeyFramedType value, JsonSerializer serializer) { throw new NotImplementedException(); }
+		public override KeyFramedType ReadJson(JsonReader reader, Type objectType, KeyFramedType existingValue, bool hasExistingValue,JsonSerializer serializer)
 		{
 			if ( reader.TokenType == JsonToken.StartObject )
 			{
 				var ThisObject = JObject.Load(reader);
-				var SingleFrame = ThisObject.ToObject<Frame_Float>(serializer);
-				existingValue.AddFrame(SingleFrame);
+				existingValue.AddFrame( ThisObject, serializer );
 			}
 			else if ( reader.TokenType == JsonToken.StartArray )
 			{
@@ -165,18 +208,26 @@ namespace PopLottie
 				foreach ( var Frame in ThisArray )
 				{
 					var FrameReader = new JTokenReader(Frame);
-					var FrameObject = JObject.Load(FrameReader);
-					var SingleFrame = FrameObject.ToObject<Frame_Float>(serializer);
-					existingValue.AddFrame(SingleFrame);
+					
+					//	might be an array of numbers
+					if ( Frame.Type == JTokenType.Integer || Frame.Type == JTokenType.Float )
+					{
+						var Value = Frame;
+						var Number = (reader.TokenType == JsonToken.Integer) ? (long)Value : (float)Value;
+						existingValue.AddFrame(Number);
+					}
+					else
+					{
+						var FrameObject = JObject.Load(FrameReader);
+						existingValue.AddFrame( FrameObject, serializer );
+					}
 				}
 			}
 			else if ( reader.TokenType == JsonToken.Integer || reader.TokenType == JsonToken.Float )
 			{
 				var Value = reader.Value;
 				var Number = (reader.TokenType == JsonToken.Integer) ? (long)Value : (float)Value;
-				var Frame = new Frame_Float();
-				Frame.i = Number;
-				existingValue.AddFrame(Frame);
+				existingValue.AddFrame(Number);
 			}
 			else 
 			{
@@ -186,22 +237,40 @@ namespace PopLottie
 			return existingValue;
 		}
 	}
+
+	//	making the json convertor simpler with a generic interface
+	interface IKeyframed<T>
+	{
+		public void AddFrame(JObject Object,JsonSerializer Serializer);
+		public void AddFrame(T Frame);
+		public void AddFrame(float Number);
+	}
 	
 	//	make this generic
 	[JsonConverter(typeof(Keyframed_Vector2Convertor))]
-	public struct Keyframed_Vector2
+	public struct Keyframed_Vector2 : IKeyframed<Frame_Vector2>
 	{
 		//public int					a;
 		//public int					ix;
 		
 		List<Frame_Vector2>		Frames;
 		
-		public void	AddFrame(Frame_Vector2 Frame)
+		public void AddFrame(float Number)
+		{
+			throw new Exception($"Vector2 should not be constructed from just a number ({Number})");
+		}
+
+		public void AddFrame(JObject Object,JsonSerializer Serializer)
+		{
+			AddFrame( Object.ToObject<Frame_Vector2>(Serializer) );
+		}
+		
+		public void AddFrame(Frame_Vector2 Frame)
 		{
 			Frames = Frames ?? new();
 			Frames.Add(Frame);
 		}
-		
+
 		public Vector2 GetValue(TimeSpan Time)
 		{
 			if ( Frames == null || Frames.Count == 0 )
@@ -209,13 +278,27 @@ namespace PopLottie
 			var xy = Frames[0].i;
 			return new Vector2(xy.x[0],xy.y[0]);
 		}
+
 	}
 	
 		//	make this generic
-	[JsonConverter(typeof(Keyframed_FloatConvertor))]
-	public struct Keyframed_Float
+	[JsonConverter(typeof(KeyframedConvertor<Keyframed_Float,Frame_Float>))]
+	public struct Keyframed_Float : IKeyframed<Frame_Float>
 	{
 		List<Frame_Float>		Frames;
+
+		public void AddFrame(float Number)
+		{
+			var Frame = new Frame_Float();
+			Frame.i.data.x = new []{0f};
+			Frame.i.data.y = new []{Number};
+			AddFrame(Frame);
+		}
+
+		public void AddFrame(JObject Object,JsonSerializer Serializer)
+		{
+			AddFrame( Object.ToObject<Frame_Float>(Serializer) );
+		}
 		
 		public void	AddFrame(Frame_Float Frame)
 		{
@@ -227,7 +310,41 @@ namespace PopLottie
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
-			return Frames[0].Value;
+			return Frames[0].GetValue(TimeSpan.Zero);
+		}
+	}
+	
+	
+		//	make this generic
+	[JsonConverter(typeof(KeyframedConvertor<Keyframed_FloatArray,Frame_FloatArray>))]
+	public struct Keyframed_FloatArray : IKeyframed<Frame_FloatArray>
+	{
+		List<Frame_FloatArray>		Frames;
+
+		public void AddFrame(float Number)
+		{
+			var Frame = new Frame_FloatArray();
+			Frame.i.data.x = new []{0f};
+			Frame.i.data.y = new []{Number};
+			AddFrame(Frame);
+		}
+
+		public void AddFrame(JObject Object,JsonSerializer Serializer)
+		{
+			AddFrame( Object.ToObject<Frame_FloatArray>(Serializer) );
+		}
+		
+		public void	AddFrame(Frame_FloatArray Frame)
+		{
+			Frames = Frames ?? new();
+			Frames.Add(Frame);
+		}
+		
+		public float GetValue(TimeSpan Time)
+		{
+			if ( Frames == null || Frames.Count == 0 )
+				return 1;
+			return Frames[0].GetValue(TimeSpan.Zero);
 		}
 	}
 	
@@ -237,8 +354,6 @@ namespace PopLottie
 		public int			a;
 		public bool			Animated => a!=0;
 		
-		//	something somewhere has xy, which might be time=x value=y
-		//public Keyframed_Vector2	k;	//	frames
 		public Keyframed_Float	k;	//	frames
 		
 		public float		GetValue(TimeSpan Time)
@@ -899,6 +1014,7 @@ namespace PopLottie
 				}
 			}
 		
+			//	not sure if its the json parser, or the format (front to back), but we need to render back to front
 			foreach ( var Layer in lottie.layers.Reverse() )
 			{
 				if ( !Layer.IsVisible(Time) )

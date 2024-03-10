@@ -53,7 +53,7 @@ namespace PopLottie
 			catch ( Exception e)
 			{
 				Debug.LogException(e);
-				Debug.LogError($"Failed to load animation; {e.Message}");
+				Debug.LogError($"Failed to load animation {_loadingIconResourceUrl}; {e.Message}");
 				Dispose();
 			}
 		}
@@ -106,25 +106,28 @@ namespace PopLottie
 		{
 			//  draw an error box if we're missing the animation
 			//  gr: can we render text easily here?
-			if ( _lottieAnimation == null && enableDebug )
+			if ( _lottieAnimation == null )
 			{
-				var TL = new Vector2( contentRect.xMin, contentRect.yMin );
-				var TR = new Vector2( contentRect.xMax, contentRect.yMin );
-				var BL = new Vector2( contentRect.xMin, contentRect.yMax );
-				var BR = new Vector2( contentRect.xMax, contentRect.yMax );
-				context.painter2D.BeginPath();
-				context.painter2D.MoveTo( TL );
-				context.painter2D.LineTo( TR );
-				context.painter2D.LineTo( BR );
-				context.painter2D.LineTo( BL );
-				context.painter2D.LineTo( TL );
-				context.painter2D.LineTo( BR );
-				context.painter2D.MoveTo( BL );
-				context.painter2D.LineTo( TR );
-				context.painter2D.ClosePath();
-				context.painter2D.lineWidth = 1;
-				context.painter2D.strokeColor = Color.magenta;
-				context.painter2D.Stroke();
+				if ( enableDebug )
+				{
+					var TL = new Vector2( contentRect.xMin, contentRect.yMin );
+					var TR = new Vector2( contentRect.xMax, contentRect.yMin );
+					var BL = new Vector2( contentRect.xMin, contentRect.yMax );
+					var BR = new Vector2( contentRect.xMax, contentRect.yMax );
+					context.painter2D.BeginPath();
+					context.painter2D.MoveTo( TL );
+					context.painter2D.LineTo( TR );
+					context.painter2D.LineTo( BR );
+					context.painter2D.LineTo( BL );
+					context.painter2D.LineTo( TL );
+					context.painter2D.LineTo( BR );
+					context.painter2D.MoveTo( BL );
+					context.painter2D.LineTo( TR );
+					context.painter2D.ClosePath();
+					context.painter2D.lineWidth = 1;
+					context.painter2D.strokeColor = Color.magenta;
+					context.painter2D.Stroke();
+				}
 				return;
 			}
 			

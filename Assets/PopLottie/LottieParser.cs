@@ -524,12 +524,19 @@ namespace PopLottie
 		Vector2		Translation;
 		Vector2		Anchor;
 		
-		public Transformer(Vector2 Translation,Vector2 Anchor,float Scale)
+		public Transformer(Vector2 Translation,Vector2 Anchor,float Scale=1)
 		{
 			this.Translation = Translation;
 			this.Anchor = Anchor;
 			Scale1 = Scale;
 			Scale2 = null;
+		}
+		public Transformer(Vector2 Translation,Vector2 Anchor,Vector2 Scale)
+		{
+			this.Translation = Translation;
+			this.Anchor = Anchor;
+			Scale1 = null;
+			Scale2 = Scale;
 		}
 		
 		Vector2		GetScale()
@@ -763,13 +770,23 @@ namespace PopLottie
 			
 			Painter.fillColor = Color.blue;
 
+			//	scale-to-canvas transformer
+			var ScaleToCanvasWidth = ContentRect.width / lottie.w;
+			var ScaleToCanvasHeight = ContentRect.height / lottie.h;
+			bool Stretch = false;
+			bool FitHeight = false;
+			var ScaleToCanvasUniform = FitHeight ? ScaleToCanvasHeight : ScaleToCanvasWidth;
+			var ScaleToCanvas = Stretch ? new Vector2( ScaleToCanvasWidth, ScaleToCanvasHeight ) : new Vector2( ScaleToCanvasUniform, ScaleToCanvasUniform );
+			Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, ScaleToCanvas );
+
 			void RenderGroup(ShapeGroup Group,Transformer LayerTransform)
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
-				
-				//	gr: elements may be in the wrong order
-				var GroupTransform = Group.GetTransformer(Time).Multiply(LayerTransform);
+
+				//	elements (shapes) in the layer may be in the wrong order, so need to pre-extract style & transform
+				var GroupTransform = Group.GetTransformer(Time);
+				GroupTransform = LayerTransform.Multiply(GroupTransform);
 				var GroupStyle = Group.GetShapeStyle(Time);
 	
 				
@@ -890,6 +907,8 @@ namespace PopLottie
 					continue;
 				
 				var LayerTransform = Layer.Transform.GetTransformer(Time);
+				LayerTransform = RootTransformer.Multiply(LayerTransform);
+				
 				
 				//	render the shape
 				foreach ( var Shape in Layer.Children )

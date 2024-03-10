@@ -143,6 +143,14 @@ namespace PopLottie
 			Frames = Frames ?? new();
 			Frames.Add(Frame);
 		}
+		
+		public Vector2 GetValue(float Time)
+		{
+			if ( Frames == null || Frames.Count == 0 )
+				return Vector2.zero;
+			var xy = Frames[0].i;
+			return new Vector2(xy.x[0],xy.y[0]);
+		}
 	}
 	
 	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/
@@ -153,14 +161,9 @@ namespace PopLottie
 		
 		public Keyframed_Vector2	k;	//	frames
 		
-		public float		GetValue(double Time)
+		public float		GetValue(float Time)
 		{
-			return 0;
-			/*
-			if ( k.Length < 1 )
-				return 0;
-			return k[0];
-			*/
+			return k.GetValue(Time).x;
 		}
 	}
 
@@ -238,7 +241,7 @@ namespace PopLottie
 		public float[]		k;	//	4 elements 0..1
 		public int			ix;	//	property index
 		
-		public Color		GetColour(double Time)
+		public Color		GetColour(float Time)
 		{
 			if ( k.Length < 4 )
 				return Color.magenta;
@@ -387,14 +390,18 @@ namespace PopLottie
 	[Serializable] public class ShapeTransform : Shape 
 	{
 		//	transform
-		//public AnimatedPosition	p;	//	translation
-		//public AnimatedPosition	a;	//	anchor
+		public AnimatedPosition	p;	//	translation
+		public AnimatedPosition	a;	//	anchor
+		
+		//	gr: not parsing as mix of animated & not
 		//public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
 		
 		public Vector2	GetTransform(float Time)
 		{
-			return Vector2.zero;
+			var Anchor = a.GetPosition(Time);
+			var Position = p.GetPosition(Time);
+			return Position + Anchor;
 		}
 	}
 	
@@ -432,11 +439,11 @@ namespace PopLottie
 			}
 			return null;
 		}
-		public Vector3		GetTransform(float Time)
+		public Vector2		GetTransform(float Time)
 		{
 			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
 			if ( Transform == null )
-				return Vector3.zero;
+				return Vector2.zero;
 			return Transform.GetTransform(Time);
 		}
 		
@@ -463,19 +470,19 @@ namespace PopLottie
 	[Serializable]
 	public struct LayerMeta	//	shape layer
 	{
-		public bool		IsVisible(double Time)
+		public bool		IsVisible(float Time)
 		{
 			if ( Time < FirstKeyframe )
-				return false;
+		{		return false;}
 			if ( Time > LastKeyframe )
 				return false;
 			return true;
 		}
 	
-		public double				ip;
-		public double				FirstKeyframe => ip;	//	visible after this
-		public double				op;	//	= 10
-		public double				LastKeyframe => op;		//	invisible after this (time?)
+		public float				ip;
+		public float				FirstKeyframe => ip;	//	visible after this
+		public float				op;	//	= 10
+		public float				LastKeyframe => op;		//	invisible after this (time?)
 		
 		public String				nm;// = "Lottie File"
 		public String				Name => nm ?? "Unnamed";
@@ -484,7 +491,7 @@ namespace PopLottie
 		public String				ResourceId => refId ?? "";
 		public int					ind;
 		public int					LayerId => ind;
-		public double				st;
+		public float				st;
 		public double				StartTime => st;
 
 		public int					ddd;	//	something to do with winding
@@ -518,11 +525,12 @@ namespace PopLottie
 	public struct Root
 	{
 		public string	v;	//"5.9.2"
-		public double	fr;
-		public double	ip;
-		public double	FirstKeyframe => ip;
-		public double	op;	//	= 10
-		public double	LastKeyframe => op;
+		public float	fr;
+		public float	FrameRate => fr;
+		public float	ip;
+		public float	FirstKeyframe => ip;
+		public float	op;	//	= 10
+		public float	LastKeyframe => op;
 		public int		w;//: = 100
 		public int		h;//: = 100
 		public String	nm;// = "Lottie File"
@@ -561,8 +569,9 @@ namespace PopLottie
 		}
 		
 		public int CurrentFrame = 0;
-		public int TotalFramesCount = 100;
+		public int TotalFramesCount = 1000;
 		public float DurationSeconds => GetDurationSeconds();
+		public float CurrentTime => GetCurrentTime();
 
 		public float GetDurationSeconds()
 		{
@@ -571,6 +580,13 @@ namespace PopLottie
 		public void DrawOneFrame(int Frame)
 		{
 			CurrentFrame = Frame;
+		}
+		
+		public float GetCurrentTime()
+		{
+			float TimeNormal = CurrentFrame / (float)TotalFramesCount;
+			var Time = Mathf.Lerp( lottie.FirstKeyframe, lottie.LastKeyframe, TimeNormal );
+			return Time;
 		}
 		
 		public void Play()
@@ -589,7 +605,7 @@ namespace PopLottie
 		
 		public void Render(Painter2D Painter,Rect ContentRect)
 		{
-			var Time = CurrentFrame;
+			var Time = CurrentTime;
 			var width = ContentRect.width;
 			var height = ContentRect.height;
 			
@@ -602,11 +618,6 @@ namespace PopLottie
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
-			
-				Painter.strokeColor = Color.green;
-				Vector3 Transform;
-				bool Filled = false;
-				bool Stroked = false;
 				
 				//	gr: elements may be in the wrong order
 				var LayerTransform = Group.GetTransform(Time);
@@ -638,7 +649,8 @@ namespace PopLottie
 							Painter.BeginPath();
 							Painter.lineWidth = 1.0f;
 							Painter.strokeColor = Color.magenta;
-							Painter.Arc(Point.Position, 1.0f, 0.0f, 360.0f);
+							var Center = Point.Position + LayerTransform;
+							Painter.Arc( Center, 1.0f, 0.0f, 360.0f);
 							Painter.Stroke();
 							Painter.ClosePath();
 						}
@@ -648,14 +660,25 @@ namespace PopLottie
 						for ( var p=0;	p<Points.Length;	p++ )
 						{
 							var Point = Points[p];
-							var ControlPoint0 = Point.Position + Point.InTangent;
-							var ControlPoint1 = Point.Position + Point.OutTangent;
+							var PrevPoint = p == 0 ? Point : Points[p-1];
+							var VertexPosition = LayerTransform + Point.Position;
+							var ControlPoint0 = VertexPosition + Point.InTangent;
+							var ControlPoint1 = VertexPosition + Point.OutTangent;
 							
+							//	skipping first one gives a more solid result, so wondering if
+							//	we need to be doing a mix of p and p+1...
 							if ( p==0 )
-								Painter.MoveTo(Point.Position);
-							
-							//Painter.BezierCurveTo( ControlPoint0, ControlPoint1, Point.Position );
-							Painter.LineTo( Point.Position );
+								Painter.MoveTo(VertexPosition);
+							else
+							{
+								Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
+								//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
+								//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
+								//Painter.BezierCurveTo( ControlPoint1, VertexPosition, ControlPoint0 );
+								//Painter.BezierCurveTo( VertexPosition, ControlPoint0, ControlPoint1  );
+								//Painter.BezierCurveTo( VertexPosition, ControlPoint1, ControlPoint0  );
+							}
+							//Painter.LineTo( VertexPosition );
 						}
 						ApplyStyle();
 						Painter.ClosePath();
@@ -665,7 +688,7 @@ namespace PopLottie
 					if ( Child is ShapeEllipse ellipse )
 					{
 						var EllipseSize = ellipse.Size.GetValue(Time);
-						var EllipseCenter = ellipse.Center.GetPosition(Time);
+						var EllipseCenter = LayerTransform + ellipse.Center.GetPosition(Time);
 		
 						var Radius = EllipseSize;
 		
@@ -674,6 +697,12 @@ namespace PopLottie
 						ApplyStyle();
 						Painter.ClosePath();
 						EllipsesDrawn++;
+					}
+					
+					if ( Child is ShapeGroup subgroup )
+					{
+						Debug.Log($"Render subgroup");
+						RenderGroup(subgroup);
 					}
 				}
 			}

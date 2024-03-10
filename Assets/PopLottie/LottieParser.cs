@@ -139,7 +139,10 @@ namespace PopLottie
 		
 		public float		GetValue(TimeSpan Time)
 		{
-			return i.GetValue(Time);
+			//return s.GetValue(Time);
+			if ( s == null )
+				return 123;
+			return s[0];
 		}
 	}
 	[Serializable] public struct Frame_FloatArray
@@ -152,7 +155,10 @@ namespace PopLottie
 		
 		public float		GetValue(TimeSpan Time)
 		{
-			return i.GetValue(Time);
+			//return s.GetValue(Time);
+			if ( s == null )
+				return 123;
+			return s[0];
 		}
 	}
 	
@@ -290,8 +296,8 @@ namespace PopLottie
 		public void AddFrame(float Number)
 		{
 			var Frame = new Frame_Float();
-			Frame.i.data.x = new []{0f};
-			Frame.i.data.y = new []{Number};
+			Frame.s = new []{Number};
+			Frame.e = new []{Number};
 			AddFrame(Frame);
 		}
 
@@ -324,8 +330,8 @@ namespace PopLottie
 		public void AddFrame(float Number)
 		{
 			var Frame = new Frame_FloatArray();
-			Frame.i.data.x = new []{0f};
-			Frame.i.data.y = new []{Number};
+			Frame.s = new []{Number};
+			Frame.e = new []{Number};
 			AddFrame(Frame);
 		}
 
@@ -469,6 +475,8 @@ namespace PopLottie
 			return new Transformer(Position,Anchor,Scale);
 		}
 	}
+	
+	
 	
 	public enum ShapeType
 	{
@@ -687,7 +695,9 @@ namespace PopLottie
 		{
 			var NewTransform = ChildTransform;
 			NewTransform.Translation += this.Translation;
-			NewTransform.Scale2 = ChildTransform.GetScale() * GetScale();
+			var ThisScale = GetScale();
+			var ChildScale = ChildTransform.GetScale();
+			NewTransform.Scale2 = ChildScale *ThisScale;
 			return NewTransform;
 		}
 	}
@@ -912,18 +922,16 @@ namespace PopLottie
 						Painter.Fill(FillRule.OddEven);
 				}
 				
-				Painter.BeginPath();
-				
-				foreach ( var Child in Children )
+				void RenderChild(Shape Child)
 				{
 					//	force visible with debug
-					if ( !Child.Visible && !EnableDebug )
-						continue; 
+					if ( !Child.Visible && !EnableDebug ) 
+						return;
 				
 					if ( Child is ShapePath path )
 					{
 						var Bezier = path.Path_Bezier.GetBezier(Time);
-						var Points = Bezier.GetControlPoints();//.Reverse().ToArray();
+						var Points = Bezier.GetControlPoints();
 						void CurveToPoint(Bezier.ControlPoint Point,Bezier.ControlPoint PrevPoint)
 						{
 							//	gr: working out this took quite a bit of time.
@@ -939,7 +947,7 @@ namespace PopLottie
 							AddDebugPoint( Point.Position, 1, Color.green, cp0 );
 							AddDebugPoint( Point.Position, 2, Color.cyan, cp1 );
 
-							if ( true || EnableDebug )
+							if ( true )
 							{
 								Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
 							}
@@ -981,7 +989,29 @@ namespace PopLottie
 			
 					if ( Child is ShapeGroup subgroup )
 					{
-						RenderGroup(subgroup,GroupTransform);
+						try
+						{
+							RenderGroup(subgroup,GroupTransform);
+						}
+						catch(Exception e)
+						{
+							Debug.LogException(e);
+						}
+					}
+				}
+				
+				
+				Painter.BeginPath();
+				
+				foreach ( var Child in Children )
+				{
+					try
+					{
+						RenderChild(Child);
+					}
+					catch(Exception e)
+					{
+						Debug.LogException(e);
 					}
 				}
 				ApplyStyle();
@@ -1027,13 +1057,20 @@ namespace PopLottie
 				//	render the shape
 				foreach ( var Shape in Layer.Children )
 				{
-					if ( Shape is ShapeGroup group )
+					try
 					{
-						RenderGroup(group,LayerTransform);
+						if ( Shape is ShapeGroup group )
+						{
+							RenderGroup(group,LayerTransform);
+						}
+						else
+						{
+							Debug.Log($"Not a group...");
+						}
 					}
-					else
+					catch(Exception e)
 					{
-						Debug.Log($"Not a group...");
+						Debug.LogException(e);
 					}
 				}
 			}

@@ -57,7 +57,9 @@ namespace PopLottie
 		
 		public float			GetValue(float Time)
 		{
-			return 0;
+			if ( k.Length == 0 )
+				return 123;
+			return k[0];
 		}
 	}
 
@@ -103,8 +105,8 @@ namespace PopLottie
 			existingValue.Frames = new();
 			if ( reader.TokenType == JsonToken.StartObject )
 			{
-				var Serializer = new JsonSerializer();
-				var SingleFrame = Serializer.Deserialize<Frame_Vector2>(reader);
+				var ThisObject = JObject.Load(reader);
+				var SingleFrame = ThisObject.ToObject<Frame_Vector2>(serializer);
 				existingValue.Frames.Add(SingleFrame);
 			}
 			else if ( reader.TokenType == JsonToken.StartArray )
@@ -113,10 +115,8 @@ namespace PopLottie
 				foreach ( var Frame in ThisArray )
 				{
 					var FrameReader = new JTokenReader(Frame);
-					var Serializer = new JsonSerializer();
-					var SingleFrame = Serializer.Deserialize<Frame_Vector2>(FrameReader);
-					//var FrameObject = JObject.Load(Frame);
-					//var SingleFrame = new Frame_Vector2(FrameObject);
+					var FrameObject = JObject.Load(FrameReader);
+					var SingleFrame = FrameObject.ToObject<Frame_Vector2>(serializer);
 					existingValue.Frames.Add(SingleFrame);
 				}
 			}
@@ -217,7 +217,7 @@ namespace PopLottie
 			return new Color(k[0],k[1],k[2],k[3]);
 		}
 	}
-	
+
 	
 	[Serializable] public struct TransformMeta
 	{
@@ -259,40 +259,36 @@ namespace PopLottie
 		
 		public override Shape ReadJson(JsonReader reader, Type objectType, Shape existingValue, bool hasExistingValue, JsonSerializer serializer)
 		{
-			var Serializer = new JsonSerializer();
-			
+			existingValue = new Shape();
+
 			var ShapeObject = JObject.Load(reader);
-			var ReReader = new JTokenReader( ShapeObject );
-			
-			//	gr: can we re-read?
-			//var ShapeBase = Serializer.Deserialize<ShapeBase>(reader);
 			var ShapeBase = new ShapeBase();
 			ShapeBase.ty = ShapeObject["ty"].Value<String>();
 			
 			//	now based on type, serialise
 			if ( ShapeBase.Type == ShapeType.Ellipse )
 			{
-				ShapeBase = Serializer.Deserialize<ShapeEllipse>(reader);
+				ShapeBase = ShapeObject.ToObject<ShapeEllipse>(serializer);
 			}
 			else if ( ShapeBase.Type == ShapeType.Fill )
 			{
-				ShapeBase = Serializer.Deserialize<ShapeFillAndStroke>(reader);
+				ShapeBase = ShapeObject.ToObject<ShapeFillAndStroke>(serializer);
 			}
 			else if ( ShapeBase.Type == ShapeType.Stroke )
 			{
-				ShapeBase = Serializer.Deserialize<ShapeFillAndStroke>(reader);
+				ShapeBase = ShapeObject.ToObject<ShapeFillAndStroke>(serializer);
 			}
 			else if ( ShapeBase.Type == ShapeType.Transform )
 			{
-				ShapeBase = Serializer.Deserialize<ShapeTransform>(reader);
+				ShapeBase = ShapeObject.ToObject<ShapeTransform>(serializer);
 			}
 			else if ( ShapeBase.Type == ShapeType.Group )
 			{
-				ShapeBase = Serializer.Deserialize<ShapeGroup>(reader);
+				ShapeBase = ShapeObject.ToObject<ShapeGroup>(serializer);
 			}
 			else if ( ShapeBase.Type == ShapeType.Path )
 			{
-				ShapeBase = Serializer.Deserialize<ShapePath>(reader);
+				ShapeBase = ShapeObject.ToObject<ShapePath>(serializer);
 			}
 
 			existingValue.TheShape = ShapeBase;
@@ -357,10 +353,10 @@ namespace PopLottie
 	[Serializable] public class ShapeTransform : ShapeBase 
 	{
 		//	transform
-		public AnimatedPosition	p;	//	translation
-		public AnimatedPosition	a;	//	anchor
-		public AnimatedVector	s;	//	scale
-		public AnimatedVector	r;	//	rotation
+		//public AnimatedPosition	p;	//	translation
+		//public AnimatedPosition	a;	//	anchor
+		//public AnimatedVector	s;	//	scale
+		//public AnimatedVector	r;	//	rotation
 	}
 	
 	
@@ -477,6 +473,7 @@ namespace PopLottie
 			
 			
 			lottie = (Root)serializer.Deserialize(new JTokenReader(Parsed), typeof(Root));
+			Debug.Log($"Decoded lottie ok x{lottie.layers.Length} layers");
 		}
 		
 		public int CurrentFrame = 0;
@@ -549,6 +546,7 @@ namespace PopLottie
 						//Painter.BezierCurveTo();
 						if ( Bezier.Closed )
 							Painter.ClosePath();
+							
 						PathsDrawn++;
 					}
 					if ( Child.TheShape is ShapeEllipse ellipse )

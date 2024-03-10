@@ -675,11 +675,11 @@ namespace PopLottie
 		public Vector2	LocalToWorld(Vector2 LocalPosition)
 		{
 			//	gr: this needs to use anchor
+			LocalPosition += Translation;
 			LocalPosition -= Anchor;
 			LocalPosition *= GetScale();
 			//	rotate here
 			LocalPosition += Anchor;
-			LocalPosition += Translation;
 			
 			return LocalPosition;
 		}

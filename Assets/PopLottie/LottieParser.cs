@@ -101,13 +101,11 @@ namespace PopLottie
 
 		public override Keyframed_Vector2 ReadJson(JsonReader reader, Type objectType, Keyframed_Vector2 existingValue, bool hasExistingValue,JsonSerializer serializer)
 		{
-			existingValue = new Keyframed_Vector2();
-			existingValue.Frames = new();
 			if ( reader.TokenType == JsonToken.StartObject )
 			{
 				var ThisObject = JObject.Load(reader);
 				var SingleFrame = ThisObject.ToObject<Frame_Vector2>(serializer);
-				existingValue.Frames.Add(SingleFrame);
+				existingValue.AddFrame(SingleFrame);
 			}
 			else if ( reader.TokenType == JsonToken.StartArray )
 			{
@@ -117,7 +115,7 @@ namespace PopLottie
 					var FrameReader = new JTokenReader(Frame);
 					var FrameObject = JObject.Load(FrameReader);
 					var SingleFrame = FrameObject.ToObject<Frame_Vector2>(serializer);
-					existingValue.Frames.Add(SingleFrame);
+					existingValue.AddFrame(SingleFrame);
 				}
 			}
 			else 
@@ -134,9 +132,16 @@ namespace PopLottie
 	[JsonConverter(typeof(Keyframed_Vector2Convertor))]
 	public struct Keyframed_Vector2
 	{
-		public int					a;
-		public int					ix;
-		public List<Frame_Vector2>	Frames;
+		//public int					a;
+		//public int					ix;
+		
+		List<Frame_Vector2>		Frames;
+		
+		public void	AddFrame(Frame_Vector2 Frame)
+		{
+			Frames = Frames ?? new();
+			Frames.Add(Frame);
+		}
 	}
 	
 	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/

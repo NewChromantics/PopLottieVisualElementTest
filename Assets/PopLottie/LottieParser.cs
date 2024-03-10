@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -277,20 +278,16 @@ namespace PopLottie
 	{
 	}
 
-	public class ShapeConvertor : JsonConverter<Shape>
+	public class ShapeConvertor : JsonConverter<ShapeWrapper>
 	{
-		public override void WriteJson(JsonWriter writer, Shape value, JsonSerializer serializer)
+		public override void WriteJson(JsonWriter writer, ShapeWrapper value, JsonSerializer serializer)
 		{
 			throw new NotImplementedException();
 		}
 		
-		public override Shape ReadJson(JsonReader reader, Type objectType, Shape existingValue, bool hasExistingValue, JsonSerializer serializer)
+		public override ShapeWrapper ReadJson(JsonReader reader, Type objectType, ShapeWrapper existingValue, bool hasExistingValue, JsonSerializer serializer)
 		{
-			existingValue = new Shape();
-			
-
 			var ShapeObject = JObject.Load(reader);
-			return existingValue;
 			var ShapeBase = new Shape();
 			ShapeBase.ty = ShapeObject["ty"].Value<String>();
 			
@@ -320,12 +317,18 @@ namespace PopLottie
 				ShapeBase = ShapeObject.ToObject<ShapePath>(serializer);
 			}
 
-			existingValue = ShapeBase;
+			existingValue.TheShape = ShapeBase;
 			return existingValue;
 		}
 	}
-
+	
 	[JsonConverter(typeof(ShapeConvertor))]
+	[Serializable] public struct ShapeWrapper 
+	{
+		public Shape		TheShape;
+		public ShapeType	Type => TheShape.Type; 
+	}
+
 	[Serializable] public class Shape 
 	{
 		public int			ind;//	?
@@ -416,16 +419,16 @@ namespace PopLottie
 	
 	[Serializable] public class ShapeGroup: Shape 
 	{
-		public Shape[]		it;	//	children
-		public Shape[]		Children => it;
+		public List<ShapeWrapper>		it;	//	children
+		public IEnumerable<Shape>		Children => it.Select( sw => sw.TheShape );
 		
 		Shape				GetChild(ShapeType MatchType)
 		{
 			//	handle multiple instances
-			foreach (var s in Children)
+			foreach (var s in it)//Children)
 			{
 				if ( s.Type == MatchType )
-					return s;
+					return s.TheShape;
 			}
 			return null;
 		}
@@ -469,32 +472,33 @@ namespace PopLottie
 			return true;
 		}
 	
-		public double	ip;
-		public double	FirstKeyframe => ip;	//	visible after this
-		public double	op;	//	= 10
-		public double	LastKeyframe => op;		//	invisible after this (time?)
+		public double				ip;
+		public double				FirstKeyframe => ip;	//	visible after this
+		public double				op;	//	= 10
+		public double				LastKeyframe => op;		//	invisible after this (time?)
 		
-		public String	nm;// = "Lottie File"
-		public String	Name => nm ?? "Unnamed";
+		public String				nm;// = "Lottie File"
+		public String				Name => nm ?? "Unnamed";
 
-		public String	refId;
-		public String	ResourceId => refId ?? "";
-		public int		ind;
-		public int		LayerId => ind;
-		public double	st;
-		public double	StartTime => st;
+		public String				refId;
+		public String				ResourceId => refId ?? "";
+		public int					ind;
+		public int					LayerId => ind;
+		public double				st;
+		public double				StartTime => st;
 
-		public int		ddd;	//	something to do with winding
-		public int		parent;
-		public int		ty;
-		public int		sr;
-		public TransformMeta	ks;
-		public TransformMeta	Transform=>ks;
-		public int		ao;
-		public bool		AutoOrient => ao != 0;
-		public Shape[]	shapes;
-		public int		bm;
-		public int		BlendMode => bm;
+		public int					ddd;	//	something to do with winding
+		public int					parent;
+		public int					ty;
+		public int					sr;
+		public TransformMeta		ks;
+		public TransformMeta		Transform=>ks;
+		public int					ao;
+		public bool					AutoOrient => ao != 0;
+		public ShapeWrapper[]		shapes;
+		public IEnumerable<Shape>	Children => shapes.Select( sw => sw.TheShape );
+		public int					bm;
+		public int					BlendMode => bm;
 	}
 	
 	[Serializable]
@@ -680,7 +684,7 @@ namespace PopLottie
 					continue;
 				
 				//	render the shape
-				foreach ( var Shape in Layer.shapes )
+				foreach ( var Shape in Layer.Children )
 				{
 					if ( Shape is ShapeGroup group )
 					{

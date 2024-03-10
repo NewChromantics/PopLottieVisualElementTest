@@ -7,197 +7,136 @@ using UnityEngine.UIElements;
 
 namespace PopLottie
 {
-    public class LottieVisualElement : VisualElement
-    {
-        // Image animation variables
-        string _loadingIconResourceUrl;
+	public class LottieVisualElement : VisualElement, IDisposable
+	{
+		// Image animation variables
+		string _loadingIconResourceUrl;
 
-        PopLottie.Animation _lottieAnimation;
-        IVisualElementScheduledItem lastSchedule;
-        bool _animEnabled;
-        bool _enableDebug;
+		PopLottie.Animation _lottieAnimation;
+		IVisualElementScheduledItem lastSchedule;
+		bool _animEnabled;
+		bool _enableDebug;
 
-        public bool enableDebug
-        {
-            get => _enableDebug;
-            set
-            {
-                _enableDebug = value;
-                MarkDirtyRepaint();
-            }
-        }
+		public bool enableDebug
+		{
+			get => _enableDebug;
+			set
+			{
+				_enableDebug = value;
+				MarkDirtyRepaint();
+			}
+		}
 
-        public string animatedImageResourceUrl
-        {
-            get => _loadingIconResourceUrl;
-            set
-            {
-                _loadingIconResourceUrl = value;
-
-                try
-                {
-                    var _animationJson = Resources.Load<TextAsset>(_loadingIconResourceUrl.ToString());
-                    if ( _animationJson == null )
-                        throw new Exception($"Text-Asset Resource not found at {_loadingIconResourceUrl}");
-                    _lottieAnimation = new Animation(_animationJson.text);
-                }
-                catch ( Exception e)
-                {
-                    Debug.LogError($"Failed to load icon resource as text asset (json); {e.Message}");
-                    _lottieAnimation = null;
-                }
-
-                // Lottie setup
-                if (_lottieAnimation != null)
-                {
-                    RebuildAnimation();
-                }
-
-                MarkDirtyRepaint();
-            }
-        }
-
-        public bool animEnabled
-        {
-            get => _animEnabled;
-            set
-            {
-                _animEnabled = value;
-
-                if (_animEnabled)
-                {
-                    this.style.display = DisplayStyle.Flex;
-                    SetStyleSize();
-                }
-                else
-                {
-                    this.style.display = DisplayStyle.None;
-                }
-
-                MarkDirtyRepaint();
-            }
-        }
+		public string animatedImageResourceUrl
+		{
+			get => _loadingIconResourceUrl;
+			set
+			{
+				_loadingIconResourceUrl = value;
+				LoadAnimation();
+				MarkDirtyRepaint();
+			}
+		}
 
 
-        private void UpdateLoadingAnim()
-        {
-            if (_lottieAnimation != null && animEnabled == true)
-            {
-                // Manually update the animation, since execute does not delta time in the lottie anim class
-                // We can use +1 here because the anim is called every frame delta anyway
-                int CurrentFrame = (_lottieAnimation.CurrentFrame + 1 >= _lottieAnimation.TotalFramesCount) ? 0 : _lottieAnimation.CurrentFrame + 1;
+		void LoadAnimation()
+		{
+			try
+			{
+				var _animationJson = Resources.Load<TextAsset>(_loadingIconResourceUrl.ToString());
+				if ( _animationJson == null )
+					throw new Exception($"Text-Asset Resource not found at {_loadingIconResourceUrl}");
+				
+				//	parse file
+				_lottieAnimation = new Animation(_animationJson.text);
+			}
+			catch ( Exception e)
+			{
+				Debug.LogException(e);
+				Debug.LogError($"Failed to load animation; {e.Message}");
+				Dispose();
+			}
+		}
+		
+		public new class UxmlFactory : UxmlFactory<LottieVisualElement, UxmlTraits> { }
+		public new class UxmlTraits : VisualElement.UxmlTraits
+		{
+			UxmlBoolAttributeDescription enableDebugAttribute = new UxmlBoolAttributeDescription()
+			{
+				name = "enableDebug",
+				defaultValue = false
+			};
+			UxmlStringAttributeDescription animatedImageResourceUrlAttribute = new UxmlStringAttributeDescription()
+			{
+				name = "animatedImageResourceUrl",
+				defaultValue = "ExampleNoExtension"
+			};
 
-                _lottieAnimation.DrawOneFrame(CurrentFrame);
-                //this.style.backgroundImage = _lottieAnimation.Texture;
+			//public UxmlTraits() { }
 
-                MarkDirtyRepaint();
-            }
-        }
+			// Use the Init method to assign the value of the progress UXML attribute to the C# progress property.
+			public override void Init(VisualElement ve, IUxmlAttributes bag, CreationContext cc)
+			{
+				base.Init(ve, bag, cc);
+				
+				(ve as LottieVisualElement).animatedImageResourceUrl = animatedImageResourceUrlAttribute.GetValueFromBag(bag, cc);
+				(ve as LottieVisualElement).enableDebug = enableDebugAttribute.GetValueFromBag(bag, cc);
+			}
+		}
 
-        public new class UxmlTraits : VisualElement.UxmlTraits
-        {
-            UxmlBoolAttributeDescription enabledAttribute = new UxmlBoolAttributeDescription()
-            {
-                name = "animEnabled",
-                defaultValue = false
-            };
-            UxmlBoolAttributeDescription enableDebugAttribute = new UxmlBoolAttributeDescription()
-            {
-                name = "enableDebug",
-                defaultValue = false
-            };
-            UxmlStringAttributeDescription animatedImageResourceUrlAttribute = new UxmlStringAttributeDescription()
-            {
-                name = "animatedImageResourceUrl",
-                defaultValue = "IconsAnim/loadingV4"
-            };
+		public LottieVisualElement()
+		{
+			RegisterCallback<GeometryChangedEvent>(OnVisualElementDirty);
+			this.RegisterCallback<DetachFromPanelEvent>(c => { this.Dispose(); });
+			generateVisualContent += GenerateVisualContent;
+		}
+		public void Dispose()
+		{
+			_lottieAnimation?.Dispose();
+			_lottieAnimation = null;
+		}
+		
+		public TimeSpan GetTime()
+		{
+			return TimeSpan.FromSeconds(0);
+		}
+		
+	
+		void GenerateVisualContent(MeshGenerationContext context)
+		{
+			//  draw an error box if we're missing the animation
+			//  gr: can we render text easily here?
+			if ( _lottieAnimation == null && enableDebug )
+			{
+				var TL = new Vector2( contentRect.xMin, contentRect.yMin );
+				var TR = new Vector2( contentRect.xMax, contentRect.yMin );
+				var BL = new Vector2( contentRect.xMin, contentRect.yMax );
+				var BR = new Vector2( contentRect.xMax, contentRect.yMax );
+				context.painter2D.BeginPath();
+				context.painter2D.MoveTo( TL );
+				context.painter2D.LineTo( TR );
+				context.painter2D.LineTo( BR );
+				context.painter2D.LineTo( BL );
+				context.painter2D.LineTo( TL );
+				context.painter2D.LineTo( BR );
+				context.painter2D.MoveTo( BL );
+				context.painter2D.LineTo( TR );
+				context.painter2D.ClosePath();
+				context.painter2D.lineWidth = 1;
+				context.painter2D.strokeColor = Color.magenta;
+				context.painter2D.Stroke();
+				return;
+			}
+			
+			var Time = GetTime();
+			_lottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
+		}
 
-            public UxmlTraits() { }
+		void OnVisualElementDirty(GeometryChangedEvent ev)
+		{
+			//	content rect changed
+		}
 
-            // Use the Init method to assign the value of the progress UXML attribute to the C# progress property.
-            public override void Init(VisualElement ve, IUxmlAttributes bag, CreationContext cc)
-            {
-                base.Init(ve, bag, cc);
 
-                Debug.Log("Init AnimatedImage UXML");
-
-                (ve as LottieVisualElement).animatedImageResourceUrl = animatedImageResourceUrlAttribute.GetValueFromBag(bag, cc);
-                (ve as LottieVisualElement).animEnabled = enabledAttribute.GetValueFromBag(bag, cc);
-                (ve as LottieVisualElement).enableDebug = enableDebugAttribute.GetValueFromBag(bag, cc);
-            }
-        }
-
-        public LottieVisualElement()
-        {
-            RegisterCallback<GeometryChangedEvent>(OnVisualElementDirty);
-            this.RegisterCallback<DetachFromPanelEvent>(c => { this.Dispose(); });
-            generateVisualContent += GenerateVisualContent;
-        }
-        
-        void GenerateVisualContent(MeshGenerationContext context)
-        {
-            if ( _lottieAnimation == null )
-                return;
-            
-            _lottieAnimation.Render(context.painter2D,contentRect,enableDebug);
-
-        }
-
-        void OnVisualElementDirty(GeometryChangedEvent ev)
-        {
-            RebuildAnimation();
-        }
-
-        public void Dispose()
-        {
-            if (lastSchedule != null)
-            {
-                lastSchedule.Pause();
-                lastSchedule = null;
-
-                _lottieAnimation.Stop();
-                _lottieAnimation.Dispose();
-            }
-        }
-
-        void SetStyleSize()
-        {
-            //this.style.scale = new Vector2(1, -1);
-        }
-
-        void RebuildAnimation()
-        {
-            // Small note, there is a bug in rlottie where anims are upside down, in USS specify 'scale: 1 -1;' which fixes it
-            // Which is automatically done in SetStyleSize();
-            SetStyleSize();
-
-            Debug.Log($"Rebuilding animation of {this.name}({this.animatedImageResourceUrl})...");
-
-            if ( _lottieAnimation == null )
-            return;
-
-            try
-            {
-                //_lottieAnimation = new PopLottie.Animation();
-
-                _lottieAnimation.Play();
-                // We pause the previous ones to avoid multiple schedules
-                if (lastSchedule != null)
-                {
-                    lastSchedule.Pause();
-                    lastSchedule = null;
-                }
-
-                int _frameDelta = Mathf.RoundToInt(((float)_lottieAnimation.DurationSeconds / _lottieAnimation.TotalFramesCount) * 1000.0f);
-                lastSchedule = this.schedule.Execute(UpdateLoadingAnim).Every(_frameDelta);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Failed to load icon resource as text asset (json); {e.Message}");
-                _lottieAnimation = null;
-            }
-        }
-
-        public new class UxmlFactory : UxmlFactory<LottieVisualElement, UxmlTraits> { }
-    }
+	}
 }

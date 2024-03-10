@@ -57,7 +57,7 @@ namespace PopLottie
 		//public Keyframed_Floats	k;	//	frames
 		public float[]			k;
 		
-		public float			GetValue(float Time)
+		public float			GetValue(TimeSpan Time)
 		{
 			if ( k.Length == 0 )
 				return 123;
@@ -202,7 +202,7 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public Vector2 GetValue(float Time)
+		public Vector2 GetValue(TimeSpan Time)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return new Vector2(1,1);
@@ -223,7 +223,7 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public float GetValue(float Time)
+		public float GetValue(TimeSpan Time)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
@@ -241,7 +241,7 @@ namespace PopLottie
 		//public Keyframed_Vector2	k;	//	frames
 		public Keyframed_Float	k;	//	frames
 		
-		public float		GetValue(float Time)
+		public float		GetValue(TimeSpan Time)
 		{
 			return k.GetValue(Time);
 		}
@@ -260,7 +260,7 @@ namespace PopLottie
 		//	non animated
 		public float[]		k;	//	frames
 		
-		public Vector2		GetPosition(float Time)
+		public Vector2		GetPosition(TimeSpan Time)
 		{
 			if ( k == null )
 				return Vector2.zero;
@@ -310,7 +310,7 @@ namespace PopLottie
 		public Bezier		k;	//	frames
 		public int			ix;	//	property index
 		
-		public Bezier		GetBezier(float Time)
+		public Bezier		GetBezier(TimeSpan Time)
 		{
 			return k;
 		}
@@ -324,7 +324,7 @@ namespace PopLottie
 		public float[]		k;	//	4 elements 0..1
 		public int			ix;	//	property index
 		
-		public Color		GetColour(float Time)
+		public Color		GetColour(TimeSpan Time)
 		{
 			if ( k.Length < 4 )
 				return Color.magenta;
@@ -346,7 +346,7 @@ namespace PopLottie
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
 		public AnimatedNumber	o;	//	opacity 0...100
 		
-		public Transformer		GetTransformer(float Time)
+		public Transformer		GetTransformer(TimeSpan Time)
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
@@ -464,14 +464,14 @@ namespace PopLottie
 		public AnimatedNumber	w;	//	width
 		public AnimatedNumber	Stroke_Width => w;
 		
-		public float			GetWidth(float Time)
+		public float			GetWidth(TimeSpan Time)
 		{
 			var Value = w.GetValue(Time);
 			//	gr: it kinda looks like unity's width is radius, and lotties is diameter, as it's consistently a bit thick
 			Value *= 0.8f;
 			return Value;
 		}
-		public Color			GetColour(float Time)
+		public Color			GetColour(TimeSpan Time)
 		{
 			return c.GetColour(Time);
 		}
@@ -488,7 +488,7 @@ namespace PopLottie
 		public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
 		
-		public Transformer	GetTransformer(float Time)
+		public Transformer	GetTransformer(TimeSpan Time)
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
@@ -592,7 +592,7 @@ namespace PopLottie
 			}
 			return null;
 		}
-		public Transformer		GetTransformer(float Time)
+		public Transformer		GetTransformer(TimeSpan Time)
 		{
 			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
 			if ( Transform == null )
@@ -600,7 +600,7 @@ namespace PopLottie
 			return Transform.GetTransformer(Time);
 		}
 		
-		public ShapeStyle		GetShapeStyle(float Time)
+		public ShapeStyle		GetShapeStyle(TimeSpan Time)
 		{
 			var Fill = GetChild(ShapeType.Fill) as ShapeFillAndStroke;
 			var Stroke = GetChild(ShapeType.Stroke) as ShapeFillAndStroke;
@@ -623,7 +623,7 @@ namespace PopLottie
 	[Serializable]
 	public struct LayerMeta	//	shape layer
 	{
-		public bool		IsVisible(float Time)
+		public bool		IsVisible(TimeSpan Time)
 		{
 			if ( Time < FirstKeyframe )
 				return false;
@@ -637,9 +637,9 @@ namespace PopLottie
 		}
 	
 		public float				ip;
-		public float				FirstKeyframe => ip;	//	visible after this
+		public TimeSpan				FirstKeyframe => TimeSpan.FromSeconds(ip);	//	visible after this
 		public float				op;	//	= 10
-		public float				LastKeyframe => op;		//	invisible after this (time?)
+		public TimeSpan				LastKeyframe => TimeSpan.FromSeconds(op);		//	invisible after this (time?)
 		
 		public String				nm;// = "Lottie File"
 		public String				Name => nm ?? "Unnamed";
@@ -685,9 +685,9 @@ namespace PopLottie
 		public float	fr;
 		public float	FrameRate => fr;
 		public float	ip;
-		public float	FirstKeyframe => ip;
+		public TimeSpan	FirstKeyframe => TimeSpan.FromSeconds(ip);
 		public float	op;	//	= 10
-		public float	LastKeyframe => op;
+		public TimeSpan	LastKeyframe => TimeSpan.FromSeconds(op);
 		public int		w;//: = 100
 		public int		h;//: = 100
 		public String	nm;// = "Lottie File"
@@ -725,39 +725,11 @@ namespace PopLottie
 			Debug.Log($"Decoded lottie ok x{lottie.layers.Length} layers");
 		}
 		
-		public int CurrentFrame = 0;
-		public int TotalFramesCount = 1000;
-		public float DurationSeconds => GetDurationSeconds();
-		public float CurrentTime => GetCurrentTime();
+		public TimeSpan Duration => lottie.LastKeyframe - lottie.FirstKeyframe;
 
-		public float GetDurationSeconds()
-		{
-			return (float)(lottie.LastKeyframe - lottie.FirstKeyframe);
-		}
-		public void DrawOneFrame(int Frame)
-		{
-			CurrentFrame = Frame;
-		}
-		
-		public float GetCurrentTime()
-		{
-			float TimeNormal = CurrentFrame / (float)TotalFramesCount;
-			var Time = Mathf.Lerp( lottie.FirstKeyframe, lottie.LastKeyframe, TimeNormal );
-			return Time;
-		}
-		
-		public void Play()
-		{
-			
-		}
-		
-		public void Stop()
-		{
-		}
-		
 		public void Dispose()
 		{
-			
+			lottie = default;
 		}
 		
 		struct DebugPoint
@@ -769,17 +741,15 @@ namespace PopLottie
 			public Color	Colour;
 		}
 		
-		public void Render(Painter2D Painter,Rect ContentRect,bool EnableDebug)
+		public void Render(TimeSpan PlayTime, Painter2D Painter,Rect ContentRect,bool EnableDebug)
 		{
-			var Time = CurrentTime;
+			//	get the time, move it to lottie-anim space and loop it
+			var Time = lottie.FirstKeyframe + TimeSpan.FromSeconds(PlayTime.TotalSeconds % this.Duration.TotalSeconds);
+			
+		
 			var width = ContentRect.width;
 			var height = ContentRect.height;
 			
-			int PathsDrawn = 0;
-			int EllipsesDrawn = 0;
-			
-			Painter.fillColor = Color.blue;
-
 			//	scale-to-canvas transformer
 			float ExtraScale = 1;	//	for debug zooming
 			var ScaleToCanvasWidth = (ContentRect.width / lottie.w)*ExtraScale;
@@ -839,7 +809,7 @@ namespace PopLottie
 					{
 						var Bezier = path.Path_Bezier.GetBezier(Time);
 						var Points = Bezier.GetControlPoints();//.Reverse().ToArray();
-						void CurveToPoint(Bezier.ControlPoint Point,Bezier.ControlPoint PrevPoint,Bezier.ControlPoint NextPoint)
+						void CurveToPoint(Bezier.ControlPoint Point,Bezier.ControlPoint PrevPoint)
 						{
 							//	gr: working out this took quite a bit of time.
 							//		the cubic bezier needs 4 points; Prev(start), tangent for first half of line(start+out), tangent for 2nd half(end+in), and the end
@@ -854,15 +824,9 @@ namespace PopLottie
 							AddDebugPoint( Point.Position, 1, Color.green, cp0 );
 							AddDebugPoint( Point.Position, 2, Color.cyan, cp1 );
 
-							//if ( EnableDebug )
-							if ( true )
+							if ( true || EnableDebug )
 							{
 								Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
-								//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
-								//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
-								//Painter.BezierCurveTo( ControlPoint1, VertexPosition, ControlPoint0 );
-								//Painter.BezierCurveTo( VertexPosition, ControlPoint0, ControlPoint1  );
-								//Painter.BezierCurveTo( VertexPosition, ControlPoint1, ControlPoint0  );
 							}
 							else
 							{
@@ -873,24 +837,20 @@ namespace PopLottie
 						for ( var p=0;	p<Points.Length;	p++ )
 						{
 							var PrevIndex = (p==0 ? Points.Length-1 : p-1);
-							var NextIndex = (p+1) % Points.Length;
 							var Point = Points[p];
 							var PrevPoint = Points[PrevIndex];
-							var NextPoint = Points[NextIndex];
 							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
 							//	skipping first one gives a more solid result, so wondering if
 							//	we need to be doing a mix of p and p+1...
 							if ( p==0 )
 								Painter.MoveTo(VertexPosition);
 							else
-								CurveToPoint(Point,PrevPoint,NextPoint);
+								CurveToPoint(Point,PrevPoint);
 						}
 						
 						if ( Bezier.Closed )
 						{
-							int DebugIndex = (CurrentFrame/2) % Points.Length;
-							//CurveToPoint( Points[DebugIndex], Points[DebugIndex], Points[DebugIndex] );
-							CurveToPoint( Points[0], Points[Points.Length-1], Points[1] );
+							CurveToPoint( Points[0], Points[Points.Length-1] );
 						}
 					}
 					if ( Child is ShapeEllipse ellipse )
@@ -902,7 +862,6 @@ namespace PopLottie
 						var Radius = EllipseSize;
 						Painter.Arc( EllipseCenter, Radius, 0, 360 );
 						AddDebugPoint( LocalCenter, 0, Color.magenta );
-						EllipsesDrawn++;
 					}
 			
 					if ( Child is ShapeGroup subgroup )
@@ -962,22 +921,6 @@ namespace PopLottie
 					}
 				}
 			}
-		/*
-			// Draw the track
-			//Painter.strokeColor = m_TrackColor;
-			Painter.BeginPath();
-			Painter.Arc(new Vector2(width * 0.5f, height * 0.5f), width * 0.5f, 0.0f, 360.0f);
-			Painter.Stroke();
-
-			// Draw the progress
-			//Painter.strokeColor = m_ProgressColor;
-			Painter.BeginPath();
-			float progress = 20; 
-			Painter.Arc(new Vector2(width * 0.5f, height * 0.5f), width * 0.5f, -90.0f, 360.0f * (progress / 100.0f) - 90.0f);
-			Painter.Stroke();
-			*/
-			
-			//Debug.Log($"Paths {PathsDrawn} Ellipses {EllipsesDrawn}");
 		}
 		
 	}

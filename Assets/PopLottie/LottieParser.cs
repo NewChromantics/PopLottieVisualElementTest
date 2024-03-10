@@ -342,7 +342,7 @@ namespace PopLottie
 		public float	sk;	//	skew angle degrees
 		public float	sa;	//	Direction at which skew is applied, in degrees (0 skews along the X axis, 90 along the Y axis)
 		*/
-		//public AnimatedVector	s;	//	scale factor, 100=no scaling
+		public AnimatedVector	s;	//	scale factor, 100=no scaling
 		public AnimatedPosition	a;	//	anchor point
 		public AnimatedPosition	p;	//	position/translation
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
@@ -352,7 +352,7 @@ namespace PopLottie
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
-			float Scale = 1;
+			float Scale = s.GetValue(Time) / 100.0f;
 			return new Transformer(Position,Anchor,Scale);
 		}
 	}
@@ -487,14 +487,14 @@ namespace PopLottie
 		public AnimatedPosition	a;	//	anchor
 		
 		//	gr: not parsing as mix of animated & not
-		//public AnimatedVector	s;	//	scale
+		public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
 		
 		public Transformer	GetTransformer(float Time)
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
-			var Scale = 1;
+			var Scale = s.GetValue(Time) / 100.0f;
 			return new Transformer( Position, Anchor, Scale);
 		}
 	}

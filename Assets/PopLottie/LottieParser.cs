@@ -468,7 +468,10 @@ namespace PopLottie
 		
 		public float			GetWidth(float Time)
 		{
-			return w.GetValue(Time);
+			var Value = w.GetValue(Time);
+			//	gr: it kinda looks like unity's width is radius, and lotties is diameter, as it's consistently a bit thick
+			Value *= 0.8f;
+			return Value;
 		}
 		public Color			GetColour(float Time)
 		{

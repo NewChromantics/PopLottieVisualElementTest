@@ -191,6 +191,28 @@ namespace PopLottie
 		public List<float[]>	v;	//	vertexes
 		public bool		c;
 		public bool		Closed => c;
+
+		public ControlPoint[]	GetControlPoints()
+		{
+			var Points = new ControlPoint[v.Count];
+			for ( var Index=0;	Index<v.Count;	Index++ )
+			{
+				Points[Index].Position.x = v[Index][0];
+				Points[Index].Position.y = v[Index][1];
+				Points[Index].InTangent.x = i[Index][0];
+				Points[Index].InTangent.y = i[Index][1];
+				Points[Index].OutTangent.x = o[Index][0];
+				Points[Index].OutTangent.x = o[Index][1];
+			}
+			return Points;
+		}
+		
+		public struct ControlPoint
+		{
+			public Vector2	InTangent;
+			public Vector2	OutTangent;
+			public Vector2	Position;
+		}
 	}
 	
 	[Serializable] public struct AnimatedBezier
@@ -265,9 +287,11 @@ namespace PopLottie
 		public override Shape ReadJson(JsonReader reader, Type objectType, Shape existingValue, bool hasExistingValue, JsonSerializer serializer)
 		{
 			existingValue = new Shape();
+			
 
 			var ShapeObject = JObject.Load(reader);
-			var ShapeBase = new ShapeBase();
+			return existingValue;
+			var ShapeBase = new Shape();
 			ShapeBase.ty = ShapeObject["ty"].Value<String>();
 			
 			//	now based on type, serialise
@@ -296,20 +320,13 @@ namespace PopLottie
 				ShapeBase = ShapeObject.ToObject<ShapePath>(serializer);
 			}
 
-			existingValue.TheShape = ShapeBase;
+			existingValue = ShapeBase;
 			return existingValue;
 		}
 	}
 
 	[JsonConverter(typeof(ShapeConvertor))]
-	[Serializable] public class Shape
-	{
-		public ShapeType	Type => TheShape.Type;
-		public ShapeBase	TheShape;
-	}
-
-
-	[Serializable] public class ShapeBase 
+	[Serializable] public class Shape 
 	{
 		public int			ind;//	?
 		public int			np;		//	number of properties
@@ -336,14 +353,14 @@ namespace PopLottie
 		};
 	}
 	
-	[Serializable] public class ShapePath : ShapeBase
+	[Serializable] public class ShapePath : Shape
 	{
 		public AnimatedBezier	ks;	//	bezier for path
 		public AnimatedBezier	Path_Bezier => ks;
 	}
 		
 				
-	[Serializable] public class ShapeFillAndStroke : ShapeBase 
+	[Serializable] public class ShapeFillAndStroke : Shape 
 	{
 		public AnimatedColour	c;	//	colour
 		public AnimatedColour	Fill_Colour => c;
@@ -352,20 +369,34 @@ namespace PopLottie
 		public AnimatedNumber	o;	//	opacity? 
 		public AnimatedNumber	w;	//	width
 		public AnimatedNumber	Stroke_Width => w;
+		
+		public float			GetWidth(float Time)
+		{
+			return w.GetValue(Time);
+		}
+		public Color			GetColour(float Time)
+		{
+			return c.GetColour(Time);
+		}
 	}
 		
 		
-	[Serializable] public class ShapeTransform : ShapeBase 
+	[Serializable] public class ShapeTransform : Shape 
 	{
 		//	transform
 		//public AnimatedPosition	p;	//	translation
 		//public AnimatedPosition	a;	//	anchor
 		//public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
+		
+		public Vector2	GetTransform(float Time)
+		{
+			return Vector2.zero;
+		}
 	}
 	
 	
-	[Serializable] public class ShapeEllipse : ShapeBase 
+	[Serializable] public class ShapeEllipse : Shape 
 	{
 		public AnimatedVector	s;
 		public AnimatedPosition	p;
@@ -374,10 +405,54 @@ namespace PopLottie
 		
 	}
 	
-	[Serializable] public class ShapeGroup: ShapeBase 
+	public struct ShapeStyle
+	{
+		public Color?	FillColour;
+		public Color?	StrokeColour;
+		public float?	StrokeWidth;
+		public bool		IsStroked => StrokeColour.HasValue;
+		public bool		IsFilled => FillColour.HasValue;
+	}
+	
+	[Serializable] public class ShapeGroup: Shape 
 	{
 		public Shape[]		it;	//	children
 		public Shape[]		Children => it;
+		
+		Shape				GetChild(ShapeType MatchType)
+		{
+			//	handle multiple instances
+			foreach (var s in Children)
+			{
+				if ( s.Type == MatchType )
+					return s;
+			}
+			return null;
+		}
+		public Vector3		GetTransform(float Time)
+		{
+			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
+			if ( Transform == null )
+				return Vector3.zero;
+			return Transform.GetTransform(Time);
+		}
+		
+		public ShapeStyle		GetShapeStyle(float Time)
+		{
+			var Fill = GetChild(ShapeType.Fill) as ShapeFillAndStroke;
+			var Stroke = GetChild(ShapeType.Stroke) as ShapeFillAndStroke;
+			var Style = new ShapeStyle();
+			if ( Fill != null )
+			{
+				Style.FillColour = Fill.GetColour(Time);
+			}
+			if ( Stroke != null )
+			{
+				Style.StrokeColour = Stroke.GetColour(Time);
+				Style.StrokeWidth = Stroke.GetWidth(Time);
+			}
+			return Style;
+		}
 	}
 	
 
@@ -529,32 +604,61 @@ namespace PopLottie
 				bool Filled = false;
 				bool Stroked = false;
 				
+				//	gr: elements may be in the wrong order
+				var LayerTransform = Group.GetTransform(Time);
+				var LayerStyle = Group.GetShapeStyle(Time);
+				
+				void ApplyStyle()
+				{
+					Painter.fillColor = LayerStyle.FillColour ?? Color.magenta;
+					Painter.lineWidth = LayerStyle.StrokeWidth ?? 10;
+					Painter.strokeColor = LayerStyle.StrokeColour ?? Color.magenta;
+					if ( LayerStyle.IsStroked )
+						Painter.Stroke();
+					if ( LayerStyle.IsFilled )
+						Painter.Fill();
+				}
+				
 				foreach ( var Child in Children )
 				{
-					if ( Child.Type == ShapeType.Fill && Child.TheShape is ShapeFillAndStroke fill )
-					{
-						Painter.fillColor = fill.Fill_Colour.GetColour(Time);
-						Filled = true;
-					}
-					if ( Child.Type == ShapeType.Stroke && Child.TheShape is ShapeFillAndStroke stroke )
-					{
-						Painter.strokeColor = stroke.Stroke_Colour.GetColour(Time);
-						Painter.lineWidth = stroke.Stroke_Width.GetValue(Time);
-						Stroked = true;
-					}
-					if ( Child.TheShape is ShapePath path )
+					if ( Child is ShapePath path )
 					{
 						var Bezier = path.Path_Bezier.GetBezier(Time);
 		
-						Painter.BeginPath();
-						//Painter.Arc(new Vector2(width * 0.3f, height * 0.3f), width * 0.5f, 0.0f, 360.0f);
-						//Painter.BezierCurveTo();
-						if ( Bezier.Closed )
+						//	draw points
+						var Points = Bezier.GetControlPoints();
+
+						
+						foreach ( var Point in Points )
+						{
+							Painter.BeginPath();
+							Painter.lineWidth = 1.0f;
+							Painter.strokeColor = Color.magenta;
+							Painter.Arc(Point.Position, 1.0f, 0.0f, 360.0f);
+							Painter.Stroke();
 							Painter.ClosePath();
+						}
+						
+						
+						Painter.BeginPath();
+						for ( var p=0;	p<Points.Length;	p++ )
+						{
+							var Point = Points[p];
+							var ControlPoint0 = Point.Position + Point.InTangent;
+							var ControlPoint1 = Point.Position + Point.OutTangent;
 							
+							if ( p==0 )
+								Painter.MoveTo(Point.Position);
+							
+							//Painter.BezierCurveTo( ControlPoint0, ControlPoint1, Point.Position );
+							Painter.LineTo( Point.Position );
+						}
+						ApplyStyle();
+						Painter.ClosePath();
+
 						PathsDrawn++;
 					}
-					if ( Child.TheShape is ShapeEllipse ellipse )
+					if ( Child is ShapeEllipse ellipse )
 					{
 						var EllipseSize = ellipse.Size.GetValue(Time);
 						var EllipseCenter = ellipse.Center.GetPosition(Time);
@@ -563,24 +667,11 @@ namespace PopLottie
 		
 						Painter.BeginPath();
 						Painter.Arc( EllipseCenter, Radius, 0, 360 );
+						ApplyStyle();
 						Painter.ClosePath();
 						EllipsesDrawn++;
 					}
-					if ( Child.TheShape is ShapeTransform transform )
-					{
-						//	do transform stuff
-						Transform = Vector3.one;
-					}
 				}
-				
-				Painter.lineWidth = 10.0f;
-				Painter.lineCap = LineCap.Butt;
-				if ( Stroked )
-					Painter.Stroke();
-				if ( Filled )
-					Painter.Fill();
-				if ( !Filled && !Stroked )
-					Debug.Log($"Layer not filled or stroked");
 			}
 		
 			foreach ( var Layer in lottie.layers )
@@ -591,7 +682,7 @@ namespace PopLottie
 				//	render the shape
 				foreach ( var Shape in Layer.shapes )
 				{
-					if ( Shape.TheShape is ShapeGroup group )
+					if ( Shape is ShapeGroup group )
 					{
 						RenderGroup(group);
 					}

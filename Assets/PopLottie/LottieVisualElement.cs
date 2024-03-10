@@ -15,6 +15,17 @@ namespace PopLottie
         PopLottie.Animation _lottieAnimation;
         IVisualElementScheduledItem lastSchedule;
         bool _animEnabled;
+        bool _enableDebug;
+
+        public bool enableDebug
+        {
+            get => _enableDebug;
+            set
+            {
+                _enableDebug = value;
+                MarkDirtyRepaint();
+            }
+        }
 
         public string animatedImageResourceUrl
         {
@@ -90,6 +101,11 @@ namespace PopLottie
                 name = "animEnabled",
                 defaultValue = false
             };
+            UxmlBoolAttributeDescription enableDebugAttribute = new UxmlBoolAttributeDescription()
+            {
+                name = "enableDebug",
+                defaultValue = false
+            };
             UxmlStringAttributeDescription animatedImageResourceUrlAttribute = new UxmlStringAttributeDescription()
             {
                 name = "animatedImageResourceUrl",
@@ -107,6 +123,7 @@ namespace PopLottie
 
                 (ve as LottieVisualElement).animatedImageResourceUrl = animatedImageResourceUrlAttribute.GetValueFromBag(bag, cc);
                 (ve as LottieVisualElement).animEnabled = enabledAttribute.GetValueFromBag(bag, cc);
+                (ve as LottieVisualElement).enableDebug = enableDebugAttribute.GetValueFromBag(bag, cc);
             }
         }
 
@@ -122,7 +139,7 @@ namespace PopLottie
             if ( _lottieAnimation == null )
                 return;
             
-            _lottieAnimation.Render(context.painter2D,contentRect);
+            _lottieAnimation.Render(context.painter2D,contentRect,enableDebug);
 
         }
 

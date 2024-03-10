@@ -29,6 +29,7 @@ namespace PopLottie
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value
+	
 	}
 	
 	public struct Keyframed_Floats
@@ -90,6 +91,19 @@ namespace PopLottie
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value
+		
+		public Float2		Value => i;
+	}
+	
+	[Serializable] public struct Frame_Float
+	{
+		public float		i;
+		public float		o;
+		public float		t;	//	time
+		public float[]		s;	//	start value
+		public float[]		e;	//	end value
+		
+		public float		Value => i;
 	}
 	
 	
@@ -127,6 +141,50 @@ namespace PopLottie
 			return existingValue;
 		}
 
+
+	}
+	
+	class Keyframed_FloatConvertor : JsonConverter<Keyframed_Float>
+	{
+		public override void WriteJson(JsonWriter writer, Keyframed_Float value, JsonSerializer serializer)
+		{
+			throw new NotImplementedException();
+		}
+
+		public override Keyframed_Float ReadJson(JsonReader reader, Type objectType, Keyframed_Float existingValue, bool hasExistingValue,JsonSerializer serializer)
+		{
+			if ( reader.TokenType == JsonToken.StartObject )
+			{
+				var ThisObject = JObject.Load(reader);
+				var SingleFrame = ThisObject.ToObject<Frame_Float>(serializer);
+				existingValue.AddFrame(SingleFrame);
+			}
+			else if ( reader.TokenType == JsonToken.StartArray )
+			{
+				var ThisArray = JArray.Load(reader);
+				foreach ( var Frame in ThisArray )
+				{
+					var FrameReader = new JTokenReader(Frame);
+					var FrameObject = JObject.Load(FrameReader);
+					var SingleFrame = FrameObject.ToObject<Frame_Float>(serializer);
+					existingValue.AddFrame(SingleFrame);
+				}
+			}
+			else if ( reader.TokenType == JsonToken.Integer || reader.TokenType == JsonToken.Float )
+			{
+				var Value = reader.Value;
+				var Number = (reader.TokenType == JsonToken.Integer) ? (long)Value : (float)Value;
+				var Frame = new Frame_Float();
+				Frame.i = Number;
+				existingValue.AddFrame(Frame);
+			}
+			else 
+			{
+				//existingValue.ReadAnimatedOrNotAnimated(reader);
+				Debug.LogWarning($"Decoding Frame_Float unhandled token type {reader.TokenType}");
+			}
+			return existingValue;
+		}
 	}
 	
 	//	make this generic
@@ -147,9 +205,29 @@ namespace PopLottie
 		public Vector2 GetValue(float Time)
 		{
 			if ( Frames == null || Frames.Count == 0 )
-				return Vector2.zero;
+				return new Vector2(1,1);
 			var xy = Frames[0].i;
 			return new Vector2(xy.x[0],xy.y[0]);
+		}
+	}
+	
+		//	make this generic
+	[JsonConverter(typeof(Keyframed_FloatConvertor))]
+	public struct Keyframed_Float
+	{
+		List<Frame_Float>		Frames;
+		
+		public void	AddFrame(Frame_Float Frame)
+		{
+			Frames = Frames ?? new();
+			Frames.Add(Frame);
+		}
+		
+		public float GetValue(float Time)
+		{
+			if ( Frames == null || Frames.Count == 0 )
+				return 1;
+			return Frames[0].Value;
 		}
 	}
 	
@@ -159,11 +237,13 @@ namespace PopLottie
 		public int			a;
 		public bool			Animated => a!=0;
 		
-		public Keyframed_Vector2	k;	//	frames
+		//	something somewhere has xy, which might be time=x value=y
+		//public Keyframed_Vector2	k;	//	frames
+		public Keyframed_Float	k;	//	frames
 		
 		public float		GetValue(float Time)
 		{
-			return k.GetValue(Time).x;
+			return k.GetValue(Time);
 		}
 	}
 
@@ -182,6 +262,9 @@ namespace PopLottie
 		
 		public Vector2		GetPosition(float Time)
 		{
+			if ( k == null )
+				return Vector2.zero;
+				
 			return new Vector2( k[0], k[1] );
 		}
 	}
@@ -260,11 +343,18 @@ namespace PopLottie
 		public float	sa;	//	Direction at which skew is applied, in degrees (0 skews along the X axis, 90 along the Y axis)
 		*/
 		//public AnimatedVector	s;	//	scale factor, 100=no scaling
-		//public AnimatedPosition	a;	//	anchor point
-		//public AnimatedPosition	p;	//	position/translation
+		public AnimatedPosition	a;	//	anchor point
+		public AnimatedPosition	p;	//	position/translation
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
-		//[JsonConverter(typeof(AnimatedNumberConvertor))]
 		public AnimatedNumber	o;	//	opacity 0...100
+		
+		public Vector2			GetTransform(float Time)
+		{
+			var Anchor = a.GetPosition(Time);
+			var Position = p.GetPosition(Time);
+			//	anchor only for rot/scale origin
+			return Position;
+		}
 	}
 	
 	public enum ShapeType
@@ -401,7 +491,8 @@ namespace PopLottie
 		{
 			var Anchor = a.GetPosition(Time);
 			var Position = p.GetPosition(Time);
-			return Position + Anchor;
+			//	anchor for scale + rot
+			return Position;
 		}
 	}
 	
@@ -473,9 +564,13 @@ namespace PopLottie
 		public bool		IsVisible(float Time)
 		{
 			if ( Time < FirstKeyframe )
-		{		return false;}
+				return false;
 			if ( Time > LastKeyframe )
 				return false;
+			/*
+			if ( Time < StartTime )
+				return false;
+				*/
 			return true;
 		}
 	
@@ -603,7 +698,7 @@ namespace PopLottie
 			
 		}
 		
-		public void Render(Painter2D Painter,Rect ContentRect)
+		public void Render(Painter2D Painter,Rect ContentRect,bool EnableDebug)
 		{
 			var Time = CurrentTime;
 			var width = ContentRect.width;
@@ -614,81 +709,119 @@ namespace PopLottie
 			
 			Painter.fillColor = Color.blue;
 
-			void RenderGroup(ShapeGroup Group)
+			void RenderGroup(ShapeGroup Group,Vector2 LayerTransform)
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
 				
 				//	gr: elements may be in the wrong order
-				var LayerTransform = Group.GetTransform(Time);
-				var LayerStyle = Group.GetShapeStyle(Time);
+				var GroupTransform = Group.GetTransform(Time) + LayerTransform;
+				var GroupStyle = Group.GetShapeStyle(Time);
+				
+				float GroupScale = 3;
+				Vector2 LocalToWorld(Vector2 ShapeLocalPosition)
+				{
+					return (ShapeLocalPosition*GroupScale) + GroupTransform;
+				}
+				float LocalScaleToWorld(float ShapeLocalScale)
+				{
+					return ShapeLocalScale * GroupScale;
+				}
 				
 				void ApplyStyle()
 				{
-					Painter.fillColor = LayerStyle.FillColour ?? Color.magenta;
-					Painter.lineWidth = LayerStyle.StrokeWidth ?? 10;
-					Painter.strokeColor = LayerStyle.StrokeColour ?? Color.magenta;
-					if ( LayerStyle.IsStroked )
+					Painter.fillColor = GroupStyle.FillColour ?? Color.green;
+					Painter.lineWidth = LocalScaleToWorld( GroupStyle.StrokeWidth ?? 1 );
+					Painter.strokeColor = GroupStyle.StrokeColour ?? Color.yellow;
+					if ( GroupStyle.IsStroked || EnableDebug )
 						Painter.Stroke();
-					if ( LayerStyle.IsFilled )
+					if ( GroupStyle.IsFilled )
 						Painter.Fill();
 				}
 				
 				foreach ( var Child in Children )
 				{
+					if ( !Child.Visible && !EnableDebug )
+						continue; 
+				
 					if ( Child is ShapePath path )
 					{
 						var Bezier = path.Path_Bezier.GetBezier(Time);
 		
-						//	draw points
 						var Points = Bezier.GetControlPoints();
 
-						
-						foreach ( var Point in Points )
-						{
-							Painter.BeginPath();
-							Painter.lineWidth = 1.0f;
-							Painter.strokeColor = Color.magenta;
-							var Center = Point.Position + LayerTransform;
-							Painter.Arc( Center, 1.0f, 0.0f, 360.0f);
-							Painter.Stroke();
-							Painter.ClosePath();
-						}
-						
-						
 						Painter.BeginPath();
+						void CurveToPoint(Bezier.ControlPoint Point)
+						{
+							var VertexPosition = LocalToWorld(Point.Position);
+							var ControlPoint0 = LocalToWorld(Point.Position + Point.InTangent);
+							var ControlPoint1 = LocalToWorld(Point.Position + Point.OutTangent);
+							Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
+							//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
+							//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
+							//Painter.BezierCurveTo( ControlPoint1, VertexPosition, ControlPoint0 );
+							//Painter.BezierCurveTo( VertexPosition, ControlPoint0, ControlPoint1  );
+							//Painter.BezierCurveTo( VertexPosition, ControlPoint1, ControlPoint0  );
+							//Painter.LineTo( VertexPosition );
+						}
 						for ( var p=0;	p<Points.Length;	p++ )
 						{
 							var Point = Points[p];
-							var PrevPoint = p == 0 ? Point : Points[p-1];
-							var VertexPosition = LayerTransform + Point.Position;
-							var ControlPoint0 = VertexPosition + Point.InTangent;
-							var ControlPoint1 = VertexPosition + Point.OutTangent;
-							
+							var VertexPosition = LocalToWorld(Point.Position);
 							//	skipping first one gives a more solid result, so wondering if
 							//	we need to be doing a mix of p and p+1...
 							if ( p==0 )
 								Painter.MoveTo(VertexPosition);
 							else
-							{
-								Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
-								//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
-								//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
-								//Painter.BezierCurveTo( ControlPoint1, VertexPosition, ControlPoint0 );
-								//Painter.BezierCurveTo( VertexPosition, ControlPoint0, ControlPoint1  );
-								//Painter.BezierCurveTo( VertexPosition, ControlPoint1, ControlPoint0  );
-							}
-							//Painter.LineTo( VertexPosition );
+								CurveToPoint(Point);
 						}
+						if ( Bezier.Closed )
+							CurveToPoint(Points[0]);
+							
 						ApplyStyle();
 						Painter.ClosePath();
 
+
+						//	draw point markers
+						if ( EnableDebug )
+						{
+							foreach ( var Point in Points )
+							{
+								var VertexPosition = LocalToWorld(Point.Position);
+								var ControlPoint0 = LocalToWorld(Point.Position + Point.InTangent);
+								var ControlPoint1 = LocalToWorld(Point.Position + Point.OutTangent);
+								Painter.lineWidth = 0.4f;
+								Painter.strokeColor = Color.red;
+								Painter.BeginPath();
+								Painter.Arc( VertexPosition, 1.4f, 0.0f, 360.0f);
+								Painter.Stroke();
+								Painter.ClosePath();
+
+								Painter.strokeColor = Color.green;
+								Painter.BeginPath();
+								Painter.MoveTo( VertexPosition );
+								Painter.LineTo( ControlPoint0 );
+								Painter.Arc( ControlPoint0, 1.2f, 0.0f, 360.0f);
+								Painter.Stroke();
+								Painter.ClosePath();
+
+								Painter.strokeColor = Color.blue;
+								Painter.BeginPath();
+								Painter.MoveTo( VertexPosition );
+								Painter.LineTo( ControlPoint1 );
+								Painter.Arc( ControlPoint1, 1.0f, 0.0f, 360.0f);
+								Painter.Stroke();
+								Painter.ClosePath();
+
+							}
+						}
+						
 						PathsDrawn++;
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
-						var EllipseSize = ellipse.Size.GetValue(Time);
-						var EllipseCenter = LayerTransform + ellipse.Center.GetPosition(Time);
+						var EllipseSize = LocalScaleToWorld( ellipse.Size.GetValue(Time) );
+						var EllipseCenter = LocalToWorld( ellipse.Center.GetPosition(Time) );
 		
 						var Radius = EllipseSize;
 		
@@ -701,23 +834,24 @@ namespace PopLottie
 					
 					if ( Child is ShapeGroup subgroup )
 					{
-						Debug.Log($"Render subgroup");
-						RenderGroup(subgroup);
+						RenderGroup(subgroup,GroupTransform);
 					}
 				}
 			}
 		
-			foreach ( var Layer in lottie.layers )
+			foreach ( var Layer in lottie.layers.Reverse() )
 			{
 				if ( !Layer.IsVisible(Time) )
 					continue;
+				
+				var LayerTransform = Layer.Transform.GetTransform(Time);
 				
 				//	render the shape
 				foreach ( var Shape in Layer.Children )
 				{
 					if ( Shape is ShapeGroup group )
 					{
-						RenderGroup(group);
+						RenderGroup(group,LayerTransform);
 					}
 					else
 					{

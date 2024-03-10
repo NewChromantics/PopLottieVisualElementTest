@@ -289,7 +289,7 @@ namespace PopLottie
 				Points[Index].InTangent.x = i[Index][0];
 				Points[Index].InTangent.y = i[Index][1];
 				Points[Index].OutTangent.x = o[Index][0];
-				Points[Index].OutTangent.x = o[Index][1];
+				Points[Index].OutTangent.y = o[Index][1];
 			}
 			return Points;
 		}
@@ -780,8 +780,9 @@ namespace PopLottie
 			Painter.fillColor = Color.blue;
 
 			//	scale-to-canvas transformer
-			var ScaleToCanvasWidth = ContentRect.width / lottie.w;
-			var ScaleToCanvasHeight = ContentRect.height / lottie.h;
+			float ExtraScale = 1;	//	for debug zooming
+			var ScaleToCanvasWidth = (ContentRect.width / lottie.w)*ExtraScale;
+			var ScaleToCanvasHeight = (ContentRect.height / lottie.h)*ExtraScale;
 			bool Stretch = false;
 			bool FitHeight = false;
 			var ScaleToCanvasUniform = FitHeight ? ScaleToCanvasHeight : ScaleToCanvasWidth;
@@ -819,7 +820,7 @@ namespace PopLottie
 					Painter.fillColor = GroupStyle.FillColour ?? Color.green;
 					Painter.lineWidth = GroupTransform.LocalToWorld( GroupStyle.StrokeWidth ?? 1 );
 					Painter.strokeColor = GroupStyle.StrokeColour ?? Color.yellow;
-					if ( GroupStyle.IsStroked || EnableDebug )
+					if ( GroupStyle.IsStroked )
 						Painter.Stroke();
 					if ( GroupStyle.IsFilled )
 						Painter.Fill(FillRule.OddEven);
@@ -836,36 +837,60 @@ namespace PopLottie
 					if ( Child is ShapePath path )
 					{
 						var Bezier = path.Path_Bezier.GetBezier(Time);
-						var Points = Bezier.GetControlPoints();
-						void CurveToPoint(Bezier.ControlPoint Point)
+						var Points = Bezier.GetControlPoints();//.Reverse().ToArray();
+						void CurveToPoint(Bezier.ControlPoint Point,Bezier.ControlPoint PrevPoint,Bezier.ControlPoint NextPoint)
 						{
+							//	gr: working out this took quite a bit of time.
+							//		the cubic bezier needs 4 points; Prev(start), tangent for first half of line(start+out), tangent for 2nd half(end+in), and the end
+							var cp0 = PrevPoint.Position + PrevPoint.OutTangent;
+							var cp1 = Point.Position + Point.InTangent;
+							
 							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
-							var ControlPoint0 = GroupTransform.LocalToWorld(Point.Position + Point.InTangent);
-							var ControlPoint1 = GroupTransform.LocalToWorld(Point.Position + Point.OutTangent);
-							Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
-							//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
-							//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
-							//Painter.BezierCurveTo( ControlPoint1, VertexPosition, ControlPoint0 );
-							//Painter.BezierCurveTo( VertexPosition, ControlPoint0, ControlPoint1  );
-							//Painter.BezierCurveTo( VertexPosition, ControlPoint1, ControlPoint0  );
-							//Painter.LineTo( VertexPosition );
+							var ControlPoint0 = GroupTransform.LocalToWorld(cp0);
+							var ControlPoint1 = GroupTransform.LocalToWorld(cp1);
+							
+							AddDebugPoint( Point.Position, 0, Color.red );
+							AddDebugPoint( Point.Position, 1, Color.green, cp0 );
+							AddDebugPoint( Point.Position, 2, Color.cyan, cp1 );
+
+							//if ( EnableDebug )
+							if ( true )
+							{
+								Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
+								//Painter.BezierCurveTo( ControlPoint0, VertexPosition, ControlPoint1 );
+								//Painter.BezierCurveTo( ControlPoint1, ControlPoint0, VertexPosition );
+								//Painter.BezierCurveTo( ControlPoint1, VertexPosition, ControlPoint0 );
+								//Painter.BezierCurveTo( VertexPosition, ControlPoint0, ControlPoint1  );
+								//Painter.BezierCurveTo( VertexPosition, ControlPoint1, ControlPoint0  );
+							}
+							else
+							{
+								Painter.LineTo( VertexPosition );
+							}
 						}
+						
 						for ( var p=0;	p<Points.Length;	p++ )
 						{
+							var PrevIndex = (p==0 ? Points.Length-1 : p-1);
+							var NextIndex = (p+1) % Points.Length;
 							var Point = Points[p];
-							AddDebugPoint( Point.Position, 0, Color.red );
-							AddDebugPoint( Point.Position, 1, Color.green, Point.Position+Point.InTangent );
-							AddDebugPoint( Point.Position, 2, Color.blue, Point.Position+Point.OutTangent );
+							var PrevPoint = Points[PrevIndex];
+							var NextPoint = Points[NextIndex];
 							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
 							//	skipping first one gives a more solid result, so wondering if
 							//	we need to be doing a mix of p and p+1...
 							if ( p==0 )
 								Painter.MoveTo(VertexPosition);
 							else
-								CurveToPoint(Point);
+								CurveToPoint(Point,PrevPoint,NextPoint);
 						}
+						
 						if ( Bezier.Closed )
-							CurveToPoint(Points[0]);
+						{
+							int DebugIndex = (CurrentFrame/2) % Points.Length;
+							//CurveToPoint( Points[DebugIndex], Points[DebugIndex], Points[DebugIndex] );
+							CurveToPoint( Points[0], Points[Points.Length-1], Points[1] );
+						}
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
@@ -895,15 +920,19 @@ namespace PopLottie
 						var WorldStart = GroupTransform.LocalToWorld(Point.Start);
 						Vector2? WorldEnd = Point.End.HasValue ? GroupTransform.LocalToWorld(Point.End.Value) : null;
 						
-						Painter.lineWidth = 0.4f;
+						Painter.lineWidth = 0.2f;
 						Painter.strokeColor = Point.Colour;
 						Painter.BeginPath();
+						Painter.MoveTo( WorldStart );
 						if ( WorldEnd is Vector2 end )
 						{
-							Painter.MoveTo( WorldStart );
 							Painter.LineTo( end );
+							Painter.Arc( end, Point.HandleSize, 0.0f, 360.0f);
 						}
-						Painter.Arc( WorldStart, Point.HandleSize, 0.0f, 360.0f);
+						else
+						{
+							Painter.Arc( WorldStart, Point.HandleSize, 0.0f, 360.0f);
+						}
 						Painter.Stroke();
 						Painter.ClosePath();
 					}

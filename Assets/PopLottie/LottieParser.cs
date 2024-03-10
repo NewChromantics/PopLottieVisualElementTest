@@ -759,6 +759,15 @@ namespace PopLottie
 			
 		}
 		
+		struct DebugPoint
+		{
+			public Vector2	Start;
+			public Vector2?	End;			//	if true, draw handle here
+			public int		Uid;			//	see if we can automatically do this, but different sizes so we see overlaps
+			public float	HandleSize => 1.0f + ((float)Uid*0.3f);
+			public Color	Colour;
+		}
+		
 		public void Render(Painter2D Painter,Rect ContentRect,bool EnableDebug)
 		{
 			var Time = CurrentTime;
@@ -790,6 +799,21 @@ namespace PopLottie
 				var GroupStyle = Group.GetShapeStyle(Time);
 	
 				
+	
+				//	to do holes in shapes, we need to do them all in one path
+				//	so do all the debug stuff on the side
+				List<DebugPoint> DebugPoints = new();
+				void AddDebugPoint(Vector2 Position,int Uid,Color Colour,Vector2? End=null)
+				{
+					var Point = new DebugPoint();
+					Point.Colour = Colour;
+					Point.Uid = Uid;
+					Point.Start = Position;
+					Point.End = End;
+					DebugPoints.Add(Point);
+				}
+	
+				
 				void ApplyStyle()
 				{
 					Painter.fillColor = GroupStyle.FillColour ?? Color.green;
@@ -798,21 +822,21 @@ namespace PopLottie
 					if ( GroupStyle.IsStroked || EnableDebug )
 						Painter.Stroke();
 					if ( GroupStyle.IsFilled )
-						Painter.Fill();
+						Painter.Fill(FillRule.OddEven);
 				}
+				
+				Painter.BeginPath();
 				
 				foreach ( var Child in Children )
 				{
+					//	force visible with debug
 					if ( !Child.Visible && !EnableDebug )
 						continue; 
 				
 					if ( Child is ShapePath path )
 					{
 						var Bezier = path.Path_Bezier.GetBezier(Time);
-		
 						var Points = Bezier.GetControlPoints();
-
-						Painter.BeginPath();
 						void CurveToPoint(Bezier.ControlPoint Point)
 						{
 							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
@@ -829,6 +853,9 @@ namespace PopLottie
 						for ( var p=0;	p<Points.Length;	p++ )
 						{
 							var Point = Points[p];
+							AddDebugPoint( Point.Position, 0, Color.red );
+							AddDebugPoint( Point.Position, 1, Color.green, Point.Position+Point.InTangent );
+							AddDebugPoint( Point.Position, 2, Color.blue, Point.Position+Point.OutTangent );
 							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
 							//	skipping first one gives a more solid result, so wondering if
 							//	we need to be doing a mix of p and p+1...
@@ -839,64 +866,46 @@ namespace PopLottie
 						}
 						if ( Bezier.Closed )
 							CurveToPoint(Points[0]);
-							
-						ApplyStyle();
-						Painter.ClosePath();
-
-
-						//	draw point markers
-						if ( EnableDebug )
-						{
-							foreach ( var Point in Points )
-							{
-								var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
-								var ControlPoint0 = GroupTransform.LocalToWorld(Point.Position + Point.InTangent);
-								var ControlPoint1 = GroupTransform.LocalToWorld(Point.Position + Point.OutTangent);
-								Painter.lineWidth = 0.4f;
-								Painter.strokeColor = Color.red;
-								Painter.BeginPath();
-								Painter.Arc( VertexPosition, 1.4f, 0.0f, 360.0f);
-								Painter.Stroke();
-								Painter.ClosePath();
-
-								Painter.strokeColor = Color.green;
-								Painter.BeginPath();
-								Painter.MoveTo( VertexPosition );
-								Painter.LineTo( ControlPoint0 );
-								Painter.Arc( ControlPoint0, 1.2f, 0.0f, 360.0f);
-								Painter.Stroke();
-								Painter.ClosePath();
-
-								Painter.strokeColor = Color.blue;
-								Painter.BeginPath();
-								Painter.MoveTo( VertexPosition );
-								Painter.LineTo( ControlPoint1 );
-								Painter.Arc( ControlPoint1, 1.0f, 0.0f, 360.0f);
-								Painter.Stroke();
-								Painter.ClosePath();
-
-							}
-						}
-						
-						PathsDrawn++;
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
 						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Time) );
-						var EllipseCenter = GroupTransform.LocalToWorld( ellipse.Center.GetPosition(Time) );
+						var LocalCenter = ellipse.Center.GetPosition(Time);
+						var EllipseCenter = GroupTransform.LocalToWorld(LocalCenter);
 		
 						var Radius = EllipseSize;
-		
-						Painter.BeginPath();
 						Painter.Arc( EllipseCenter, Radius, 0, 360 );
-						ApplyStyle();
-						Painter.ClosePath();
+						AddDebugPoint( LocalCenter, 0, Color.magenta );
 						EllipsesDrawn++;
 					}
-					
+			
 					if ( Child is ShapeGroup subgroup )
 					{
 						RenderGroup(subgroup,GroupTransform);
+					}
+				}
+				ApplyStyle();
+				Painter.ClosePath();
+			
+				
+				if ( EnableDebug )
+				{
+					foreach ( var Point in DebugPoints )
+					{
+						var WorldStart = GroupTransform.LocalToWorld(Point.Start);
+						Vector2? WorldEnd = Point.End.HasValue ? GroupTransform.LocalToWorld(Point.End.Value) : null;
+						
+						Painter.lineWidth = 0.4f;
+						Painter.strokeColor = Point.Colour;
+						Painter.BeginPath();
+						if ( WorldEnd is Vector2 end )
+						{
+							Painter.MoveTo( WorldStart );
+							Painter.LineTo( end );
+						}
+						Painter.Arc( WorldStart, Point.HandleSize, 0.0f, 360.0f);
+						Painter.Stroke();
+						Painter.ClosePath();
 					}
 				}
 			}

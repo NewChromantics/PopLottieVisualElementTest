@@ -87,9 +87,21 @@ namespace PopLottie
 		public LottieVisualElement()
 		{
 			RegisterCallback<GeometryChangedEvent>(OnVisualElementDirty);
-			this.RegisterCallback<DetachFromPanelEvent>(c => { this.Dispose(); });
+			RegisterCallback<DetachFromPanelEvent>(c => { this.OnDetached(); });
+			RegisterCallback<AttachToPanelEvent>(c => { this.OnAttached(); });
+
 			generateVisualContent += GenerateVisualContent;
 		}
+		
+		void OnAttached()
+		{
+			LoadAnimation();
+		}
+		void OnDetached()
+		{
+			Dispose();
+		}
+		
 		public void Dispose()
 		{
 			_lottieAnimation?.Dispose();
@@ -138,6 +150,7 @@ namespace PopLottie
 		void OnVisualElementDirty(GeometryChangedEvent ev)
 		{
 			//	content rect changed
+			Debug.Log($"OnVisualElementDirty anim={this._lottieAnimation} resource={this.animatedImageResourceUrl}");
 		}
 
 

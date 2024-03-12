@@ -871,6 +871,7 @@ namespace PopLottie
 			//	get the time, move it to lottie-anim space and loop it
 			var Time = lottie.FirstKeyframe + TimeSpan.FromSeconds(PlayTime.TotalSeconds % this.Duration.TotalSeconds);
 			
+			//Debug.Log($"Time = {Time.TotalSeconds} ({lottie.FirstKeyframe.TotalSeconds}...{lottie.LastKeyframe.TotalSeconds})");
 		
 			var width = ContentRect.width;
 			var height = ContentRect.height;
@@ -925,8 +926,9 @@ namespace PopLottie
 				void RenderChild(Shape Child)
 				{
 					//	force visible with debug
-					if ( !Child.Visible && !EnableDebug ) 
-						return;
+					if ( !Child.Visible )
+						if ( !EnableDebug ) 
+							return;
 				
 					if ( Child is ShapePath path )
 					{

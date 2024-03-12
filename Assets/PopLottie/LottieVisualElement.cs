@@ -91,6 +91,10 @@ namespace PopLottie
 			RegisterCallback<AttachToPanelEvent>(c => { this.OnAttached(); });
 
 			generateVisualContent += GenerateVisualContent;
+			
+			//	auto play by repainting this element (RIP child elements)
+			var FrameDeltaMs = 30;
+			this.schedule.Execute( MarkDirtyRepaint ).Every(FrameDeltaMs);
 		}
 		
 		void OnAttached()
@@ -110,7 +114,7 @@ namespace PopLottie
 		
 		public TimeSpan GetTime()
 		{
-			return TimeSpan.FromSeconds(0);
+			return TimeSpan.FromSeconds( Time.time );
 		}
 		
 	

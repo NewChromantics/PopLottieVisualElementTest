@@ -19,6 +19,8 @@ namespace PopLottie
 	//	spec is readable here
 	//	https://lottiefiles.github.io/lottie-docs/breakdown/bouncy_ball/
 
+	using FrameNumber = System.Single;	//	float
+
 	[Serializable] public struct AssetMeta
 	{
 	}
@@ -93,9 +95,9 @@ namespace PopLottie
 		
 		public Keyframed_FloatArray	k;	//	frames
 		
-		public float			GetValue(int Frame)
+		public float			GetValue(FrameNumber Frame,float Default)
 		{
-			return k.GetValue(Frame);
+			return k.GetValue(Frame,Default);
 		}
 	}
 
@@ -125,7 +127,7 @@ namespace PopLottie
 		public float		t;	//	time
 		public float[]		s;	//	value at time
 		//public float[]		e;	//	end value
-		public int			Frame => (int)t;	
+		public FrameNumber	Frame => t;	
 		
 		public Float2		LerpTo(Frame_Vector2 Next,float Lerp)
 		{
@@ -143,11 +145,17 @@ namespace PopLottie
 		public ValueCurve	o;	//	ease out value
 		public float		t;	//	time
 		public float[]		s;	//	value at time
-		//public float[]		e;	//	end value
-		public int			Frame => (int)t;
+		public float[]		e;	//	end value
+		public FrameNumber	Frame => t;
 		
-		public float		LerpTo(Frame_Float Next,float Lerp)
+		public float		LerpTo(Frame_Float Next,float Lerp,float Default)
 		{
+			//	gr: find out when these are missing (bad parse, or end?)
+			if ( Next.s == null )
+				Next = this;
+			if ( this.s == null )
+				return Default;
+				
 			return Mathf.Lerp( this.s[0], Next.s[0], Lerp );
 		}
 		
@@ -158,12 +166,18 @@ namespace PopLottie
 		public ValueCurve	o;
 		public float		t;	//	time
 		public float[]		s;	//	start value
-		//public float[]		e;	//	end value
-		public int Frame	=> (int)t;
+		public float[]		e;	//	end value
+		public FrameNumber Frame	=> t;
 
 			
 		public float[]		LerpTo(Frame_FloatArray Next,float Lerp)
 		{
+			//	gr: find out why this is missing values
+			if ( Next.s == null )
+				Next = this;
+			if ( this.s == null )
+				return null;
+		
 			//	lerp each member
 			var Values = s;
 			for ( int i=0;	i<Values.Length;	i++ )
@@ -299,12 +313,15 @@ namespace PopLottie
 
 	public interface IFrame
 	{
-		public int		Frame { get;}
+		public FrameNumber		Frame { get;}
 		
-		static (FRAMETYPE,float,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,int TargetFrame) where FRAMETYPE : IFrame
+		static (FRAMETYPE,float,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,FrameNumber TargetFrame) where FRAMETYPE : IFrame
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				throw new Exception("Missing frames");
+			
+			if ( Frames.Count == 1 )
+				return (Frames[0],0,Frames[0]);
 			
 			//	find previous & next frames
 			var PrevIndex = 0;
@@ -313,12 +330,17 @@ namespace PopLottie
 				var ThisFrame = Frames[f];
 				if ( ThisFrame.Frame > TargetFrame )
 					break;
+				PrevIndex = f;
 			}
 			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);
 			var Prev = Frames[PrevIndex];
 			var Next = Frames[NextIndex];
 			//	get the lerp(time) between prev & next
 			var Lerp = Mathf.InverseLerp( Prev.Frame, Next.Frame, TargetFrame );
+			if ( Lerp < 0 )
+				Lerp = 0;
+			if ( Lerp > 1 )
+				Lerp = 1;
 			return (Prev,Lerp,Next);
 		}
 		
@@ -350,13 +372,13 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public float GetValue(int Frame)
+		public float GetValue(FrameNumber Frame,float Default)
 		{
 			if ( Frames == null || Frames.Count == 0 )
-				return 1;
+				return Default;
 				
 			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
-			return Prev.LerpTo( Next, Lerp );
+			return Prev.LerpTo( Next, Lerp, Default );
 		}
 	}
 	
@@ -386,13 +408,16 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public float GetValue(int Frame)
+		//	default = hack whilst developing
+		public float GetValue(FrameNumber Frame,float Default)
 		{
 			if ( Frames == null || Frames.Count == 0 )
-				return 1;
+				return Default;
 			
 			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
 			var LerpedValues = Prev.LerpTo(Next,Lerp);
+			if ( LerpedValues == null || LerpedValues.Length == 0 )
+				return Default;
 			return LerpedValues[0];
 		}
 	}
@@ -405,9 +430,9 @@ namespace PopLottie
 		
 		public Keyframed_Float	k;	//	frames
 		
-		public float		GetValue(int Frame)
+		public float		GetValue(FrameNumber Frame,float Default)
 		{
-			return k.GetValue(Frame);
+			return k.GetValue(Frame,Default);
 		}
 	}
 
@@ -424,7 +449,7 @@ namespace PopLottie
 		//	non animated
 		public float[]		k;	//	frames
 		
-		public Vector2		GetPosition(int Frame)
+		public Vector2		GetPosition(FrameNumber Frame)
 		{
 			if ( k == null )
 				return Vector2.zero;
@@ -474,7 +499,7 @@ namespace PopLottie
 		public Bezier		k;	//	frames
 		public int			ix;	//	property index
 		
-		public Bezier		GetBezier(int Frame)
+		public Bezier		GetBezier(FrameNumber Frame)
 		{
 			return k;
 		}
@@ -488,10 +513,12 @@ namespace PopLottie
 		public float[]		k;	//	4 elements 0..1
 		public int			ix;	//	property index
 		
-		public Color		GetColour(int Frame)
+		public Color		GetColour(FrameNumber Frame)
 		{
 			if ( k.Length < 4 )
 				return Color.magenta;
+			if ( Animated )
+				Debug.Log($"not animating colour");
 			return new Color(k[0],k[1],k[2],k[3]);
 		}
 	}
@@ -510,18 +537,18 @@ namespace PopLottie
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
 		public AnimatedNumber	o;	//	opacity 0...100
 		
-		public Transformer		GetTransformer(int Frame)
+		public Transformer		GetTransformer(FrameNumber Frame)
 		{
 			var Anchor = a.GetPosition(Frame);
 			var Position = p.GetPosition(Frame);
-			float Scale = s.GetValue(Frame) / 100.0f;
+			float Scale = s.GetValue(Frame,Default:100) / 100.0f;
 			return new Transformer(Position,Anchor,Scale);
 		}
 		
 		//	returns 0-1
-		public float			GetOpacity(int Frame)
+		public float			GetOpacity(FrameNumber Frame)
 		{
-			var Opacity = o.GetValue(Frame);
+			var Opacity = o.GetValue(Frame,Default:100);
 			return Opacity / 100.0f;
 		}
 	}
@@ -637,14 +664,14 @@ namespace PopLottie
 		public AnimatedNumber	w;	//	width
 		public AnimatedNumber	Stroke_Width => w;
 		
-		public float			GetWidth(int Frame)
+		public float			GetWidth(FrameNumber Frame)
 		{
-			var Value = w.GetValue(Frame);
+			var Value = w.GetValue(Frame,Default:42);
 			//	gr: it kinda looks like unity's width is radius, and lotties is diameter, as it's consistently a bit thick
 			Value *= 0.8f;
 			return Value;
 		}
-		public Color			GetColour(int Frame)
+		public Color			GetColour(FrameNumber Frame)
 		{
 			return c.GetColour(Frame);
 		}
@@ -662,17 +689,17 @@ namespace PopLottie
 		//public AnimatedVector	r;	//	rotation
 		public AnimatedNumber	o;	//	opacity
 		
-		public Transformer	GetTransformer(int Frame)
+		public Transformer	GetTransformer(FrameNumber Frame)
 		{
 			var Anchor = a.GetPosition(Frame);
 			var Position = p.GetPosition(Frame);
-			var Scale = s.GetValue(Frame) / 100.0f;
+			var Scale = s.GetValue(Frame,Default:100) / 100.0f;
 			return new Transformer( Position, Anchor, Scale);
 		}
 		
-		public float GetAlpha(int Frame)
+		public float GetAlpha(FrameNumber Frame)
 		{
-			var Opacity = o.GetValue(Frame);
+			var Opacity = o.GetValue(Frame,Default:100);
 			float Alpha = Opacity / 100.0f;
 			return Alpha;
 		}
@@ -775,7 +802,7 @@ namespace PopLottie
 			}
 			return null;
 		}
-		public Transformer		GetTransformer(int Frame)
+		public Transformer		GetTransformer(FrameNumber Frame)
 		{
 			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
 			if ( Transform == null )
@@ -784,7 +811,7 @@ namespace PopLottie
 		}
 		
 		//	this comes from the transform, but we're just not keeping it with it
-		public float		GetAlpha(int Frame)
+		public float		GetAlpha(FrameNumber Frame)
 		{
 			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
 			if ( Transform == null )
@@ -792,7 +819,7 @@ namespace PopLottie
 			return Transform.GetAlpha(Frame);
 		}
 		
-		public ShapeStyle		GetShapeStyle(int Frame)
+		public ShapeStyle		GetShapeStyle(FrameNumber Frame)
 		{
 			var Fill = GetChild(ShapeType.Fill) as ShapeFillAndStroke;
 			var Stroke = GetChild(ShapeType.Stroke) as ShapeFillAndStroke;
@@ -816,7 +843,7 @@ namespace PopLottie
 	[Serializable]
 	public struct LayerMeta	//	shape layer
 	{
-		public bool		IsVisible(int Frame)
+		public bool		IsVisible(FrameNumber Frame)
 		{
 			if ( Frame < FirstKeyFrame )
 				return false;
@@ -960,7 +987,7 @@ namespace PopLottie
 			Render( Frame, Painter, ContentRect, EnableDebug );
 		}
 			
-		public void Render(int Frame, Painter2D Painter,Rect ContentRect,bool EnableDebug)
+		public void Render(FrameNumber Frame, Painter2D Painter,Rect ContentRect,bool EnableDebug)
 		{
 			//Debug.Log($"Time = {Time.TotalSeconds} ({lottie.FirstKeyframe.TotalSeconds}...{lottie.LastKeyframe.TotalSeconds})");
 		
@@ -1076,7 +1103,7 @@ namespace PopLottie
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
-						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Frame) );
+						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Frame,Default:10) );
 						var LocalCenter = ellipse.Center.GetPosition(Frame);
 						var EllipseCenter = GroupTransform.LocalToWorld(LocalCenter);
 		

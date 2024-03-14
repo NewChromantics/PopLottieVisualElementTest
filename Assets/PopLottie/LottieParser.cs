@@ -118,18 +118,26 @@ namespace PopLottie
 	
 	
 	//	make this generic too
-	[Serializable] public struct Frame_Vector2
+	[Serializable] public struct Frame_Vector2 : IFrame
 	{
-		public Float2		i;
-		public Float2		o;
+		public Float2		i;	//	ease
+		public Float2		o;	//	ease out
 		public float		t;	//	time
-		public float[]		s;	//	start value
-		public float[]		e;	//	end value
+		public float[]		s;	//	value at time
+		//public float[]		e;	//	end value
+		public int			Frame => (int)t;	
 		
-		public Float2		Value => i;
+		public Float2		LerpTo(Frame_Vector2 Next,float Lerp)
+		{
+			//	lerp each member
+			Float2 Values;
+			Values.x = new float[]{ Mathf.Lerp( this.s[0], Next.s[0], Lerp ) };
+			Values.y = new float[]{ Mathf.Lerp( this.s[1], Next.s[1], Lerp ) };
+			return Values;
+		}
 	}
 	
-	[Serializable] public struct Frame_Float
+	[Serializable] public struct Frame_Float : IFrame
 	{
 		public ValueCurve	i;	//	ease in value
 		public ValueCurve	o;	//	ease out value
@@ -143,28 +151,24 @@ namespace PopLottie
 			return Mathf.Lerp( this.s[0], Next.s[0], Lerp );
 		}
 		
-		public float		GetValue(TimeSpan Time)
-		{
-			//return s.GetValue(Time);
-			if ( s == null )
-				return 123;
-			return s[0];
-		}
 	}
-	[Serializable] public struct Frame_FloatArray
+	[Serializable] public struct Frame_FloatArray : IFrame
 	{
 		public ValueCurve	i;
 		public ValueCurve	o;
 		public float		t;	//	time
 		public float[]		s;	//	start value
-		public float[]		e;	//	end value
-		
-		public float		GetValue(TimeSpan Time)
+		//public float[]		e;	//	end value
+		public int Frame	=> (int)t;
+
+			
+		public float[]		LerpTo(Frame_FloatArray Next,float Lerp)
 		{
-			//return s.GetValue(Time);
-			if ( s == null )
-				return 123;
-			return s[0];
+			//	lerp each member
+			var Values = s;
+			for ( int i=0;	i<Values.Length;	i++ )
+				Values[i] = Mathf.Lerp( this.s[i], Next.s[i], Lerp );
+			return Values;
 		}
 	}
 	
@@ -292,6 +296,34 @@ namespace PopLottie
 		}
 
 	}
+
+	public interface IFrame
+	{
+		public int		Frame { get;}
+		
+		static (FRAMETYPE,float,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,int TargetFrame) where FRAMETYPE : IFrame
+		{
+			if ( Frames == null || Frames.Count == 0 )
+				throw new Exception("Missing frames");
+			
+			//	find previous & next frames
+			var PrevIndex = 0;
+			for ( int f=0;	f<Frames.Count;	f++ )
+			{
+				var ThisFrame = Frames[f];
+				if ( ThisFrame.Frame > TargetFrame )
+					break;
+			}
+			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);
+			var Prev = Frames[PrevIndex];
+			var Next = Frames[NextIndex];
+			//	get the lerp(time) between prev & next
+			var Lerp = Mathf.InverseLerp( Prev.Frame, Next.Frame, TargetFrame );
+			return (Prev,Lerp,Next);
+		}
+		
+	}
+	
 	
 		//	make this generic
 	[JsonConverter(typeof(KeyframedConvertor<Keyframed_Float,Frame_Float>))]
@@ -318,33 +350,12 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		(Frame_Float,float,Frame_Float) GetPrevNextFramesAtFrame(int TargetFrame)
-		{
-			if ( Frames == null || Frames.Count == 0 )
-				throw new Exception("Missing frames");
-			
-			//	find previous & next frames
-			var PrevIndex = 0;
-			for ( int f=0;	f<Frames.Count;	f++ )
-			{
-				var ThisFrame = Frames[f];
-				if ( ThisFrame.Frame > TargetFrame )
-					break;
-			}
-			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);
-			var Prev = Frames[PrevIndex];
-			var Next = Frames[NextIndex];
-			//	get the lerp(time) between prev & next
-			var Lerp = Mathf.InverseLerp( Prev.Frame, Next.Frame, TargetFrame );
-			return (Prev,Lerp,Next);
-		}
-		
 		public float GetValue(int Frame)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
 				
-			var (Prev,Lerp,Next) = GetPrevNextFramesAtFrame(Frame);
+			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
 			return Prev.LerpTo( Next, Lerp );
 		}
 	}
@@ -360,7 +371,7 @@ namespace PopLottie
 		{
 			var Frame = new Frame_FloatArray();
 			Frame.s = new []{Number};
-			Frame.e = new []{Number};
+			//Frame.e = new []{Number};
 			AddFrame(Frame);
 		}
 
@@ -379,9 +390,10 @@ namespace PopLottie
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
-			if ( Frames.Count > 1 )
-				Debug.Log($"todo pick frame({Frame}) from {Frames[0].t}...{Frames[Frames.Count-1].t}({Frames.Count})");
-			return Frames[0].GetValue(TimeSpan.Zero);
+			
+			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
+			var LerpedValues = Prev.LerpTo(Next,Lerp);
+			return LerpedValues[0];
 		}
 	}
 	
@@ -648,6 +660,7 @@ namespace PopLottie
 		//	gr: not parsing as mix of animated & not
 		public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
+		public AnimatedNumber	o;	//	opacity
 		
 		public Transformer	GetTransformer(int Frame)
 		{
@@ -655,6 +668,13 @@ namespace PopLottie
 			var Position = p.GetPosition(Frame);
 			var Scale = s.GetValue(Frame) / 100.0f;
 			return new Transformer( Position, Anchor, Scale);
+		}
+		
+		public float GetAlpha(int Frame)
+		{
+			var Opacity = o.GetValue(Frame);
+			float Alpha = Opacity / 100.0f;
+			return Alpha;
 		}
 	}
 	
@@ -763,6 +783,15 @@ namespace PopLottie
 			return Transform.GetTransformer(Frame);
 		}
 		
+		//	this comes from the transform, but we're just not keeping it with it
+		public float		GetAlpha(int Frame)
+		{
+			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
+			if ( Transform == null )
+				return 1.0f;
+			return Transform.GetAlpha(Frame);
+		}
+		
 		public ShapeStyle		GetShapeStyle(int Frame)
 		{
 			var Fill = GetChild(ShapeType.Fill) as ShapeFillAndStroke;
@@ -779,6 +808,7 @@ namespace PopLottie
 			}
 			return Style;
 		}
+
 	}
 	
 
@@ -907,6 +937,7 @@ namespace PopLottie
 		}
 		
 		public TimeSpan Duration => lottie.Duration;
+		public int		FrameCount => lottie.LastKeyFrame-lottie.FirstKeyFrame;
 
 		public void Dispose()
 		{
@@ -946,7 +977,7 @@ namespace PopLottie
 			var ScaleToCanvas = Stretch ? new Vector2( ScaleToCanvasWidth, ScaleToCanvasHeight ) : new Vector2( ScaleToCanvasUniform, ScaleToCanvasUniform );
 			Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, ScaleToCanvas );
 
-			void RenderGroup(ShapeGroup Group,Transformer LayerTransform)
+			void RenderGroup(ShapeGroup Group,Transformer LayerTransform,float LayerAlpha)
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
@@ -955,7 +986,8 @@ namespace PopLottie
 				var GroupTransform = Group.GetTransformer(Frame);
 				GroupTransform = LayerTransform.Multiply(GroupTransform);
 				var GroupStyle = Group.GetShapeStyle(Frame);
-	
+				var GroupAlpha = Group.GetAlpha(Frame);
+				GroupAlpha *= LayerAlpha;
 				
 	
 				//	to do holes in shapes, we need to do them all in one path
@@ -974,9 +1006,13 @@ namespace PopLottie
 				
 				void ApplyStyle()
 				{
-					Painter.fillColor = GroupStyle.FillColour ?? Color.green;
+					var FillColour = GroupStyle.FillColour ?? Color.green;
+					var StrokeColour = GroupStyle.StrokeColour ?? Color.yellow;
+					FillColour.a *= GroupAlpha;
+					StrokeColour.a *= GroupAlpha;
+					Painter.fillColor = FillColour;
+					Painter.strokeColor = StrokeColour;
 					Painter.lineWidth = GroupTransform.LocalToWorld( GroupStyle.StrokeWidth ?? 1 );
-					Painter.strokeColor = GroupStyle.StrokeColour ?? Color.yellow;
 					if ( GroupStyle.IsStroked )
 						Painter.Stroke();
 					if ( GroupStyle.IsFilled )
@@ -1053,7 +1089,7 @@ namespace PopLottie
 					{
 						try
 						{
-							RenderGroup(subgroup,GroupTransform);
+							RenderGroup(subgroup,GroupTransform,GroupAlpha);
 						}
 						catch(Exception e)
 						{
@@ -1118,7 +1154,16 @@ namespace PopLottie
 				
 				//	skip hidden layers
 				if ( LayerOpacity <= 0 )
-					continue;
+				{
+					if ( EnableDebug )
+					{
+						LayerOpacity = 0.1f;
+					}
+					else
+					{
+						continue;
+					}
+				}
 
 				//	render the shape
 				foreach ( var Shape in Layer.Children )
@@ -1127,7 +1172,7 @@ namespace PopLottie
 					{
 						if ( Shape is ShapeGroup group )
 						{
-							RenderGroup(group,LayerTransform);
+							RenderGroup(group,LayerTransform,LayerOpacity);
 						}
 						else
 						{

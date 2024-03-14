@@ -147,9 +147,12 @@ namespace PopLottie
 				return;
 			}
 			
+			FrameNumber = (FrameNumber+1) % _lottieAnimation.FrameCount;
 			var Time = GetTime();
-			_lottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
+			//_lottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
+			_lottieAnimation.Render( FrameNumber, context.painter2D, contentRect, enableDebug );
 		}
+		int FrameNumber = 0;
 
 		void OnVisualElementDirty(GeometryChangedEvent ev)
 		{

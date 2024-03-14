@@ -97,7 +97,26 @@ namespace PopLottie
 		
 		public float			GetValue(FrameNumber Frame,float Default)
 		{
+			return k.GetValue(Frame,new float[]{Default})[0];
+		}
+		
+		public float[]			GetValue(FrameNumber Frame,float[] Default)
+		{
 			return k.GetValue(Frame,Default);
+		}
+		
+		public Vector2			GetValue(FrameNumber Frame,Vector2 Default)
+		{
+			var Default2 = new float[]{Default.x,Default.y};
+			var Values = GetValue(Frame,Default2);
+			if ( Values.Length == 0 )
+				return Default;
+				
+			//	1D scale... usually
+			if ( Values.Length == 1 )
+				return new Vector2(Values[0],Values[0]);
+				
+			return new Vector2(Values[0],Values[1]);
 		}
 	}
 
@@ -330,13 +349,21 @@ namespace PopLottie
 				var ThisFrame = Frames[f];
 				if ( ThisFrame.Frame > TargetFrame )
 					break;
+				//if ( ThisFrame.Frame >= TargetFrame ) break;
 				PrevIndex = f;
 			}
 			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);
 			var Prev = Frames[PrevIndex];
 			var Next = Frames[NextIndex];
 			//	get the lerp(time) between prev & next
-			var Lerp = Mathf.InverseLerp( Prev.Frame, Next.Frame, TargetFrame );
+			float Range(float Min,float Max,float Value)
+			{
+				if ( Max-Min <= 0 )
+					return 0;
+				return (Value-Min)/(Max-Min);
+			}
+			//var Lerp = Mathf.InverseLerp( Prev.Frame, Next.Frame, TargetFrame );
+			var Lerp = Range( Prev.Frame, Next.Frame, TargetFrame );
 			if ( Lerp < 0 )
 				Lerp = 0;
 			if ( Lerp > 1 )
@@ -409,7 +436,7 @@ namespace PopLottie
 		}
 		
 		//	default = hack whilst developing
-		public float GetValue(FrameNumber Frame,float Default)
+		public float[] GetValue(FrameNumber Frame,float[] Default)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return Default;
@@ -418,7 +445,7 @@ namespace PopLottie
 			var LerpedValues = Prev.LerpTo(Next,Lerp);
 			if ( LerpedValues == null || LerpedValues.Length == 0 )
 				return Default;
-			return LerpedValues[0];
+			return LerpedValues;
 		}
 	}
 	
@@ -541,7 +568,8 @@ namespace PopLottie
 		{
 			var Anchor = a.GetPosition(Frame);
 			var Position = p.GetPosition(Frame);
-			float Scale = s.GetValue(Frame,Default:100) / 100.0f;
+			var FullScale = new Vector2(100,100);
+			var Scale = s.GetValue(Frame,Default:FullScale) /FullScale;
 			return new Transformer(Position,Anchor,Scale);
 		}
 		
@@ -693,7 +721,8 @@ namespace PopLottie
 		{
 			var Anchor = a.GetPosition(Frame);
 			var Position = p.GetPosition(Frame);
-			var Scale = s.GetValue(Frame,Default:100) / 100.0f;
+			var FullScale = new Vector2(100,100);
+			var Scale = s.GetValue(Frame,Default:FullScale) /FullScale;
 			return new Transformer( Position, Anchor, Scale);
 		}
 		
@@ -727,24 +756,14 @@ namespace PopLottie
 	//	also for layers, but can't call this Transform
 	public struct Transformer
 	{
-		Vector2?	Scale2;
-		float?		Scale1;
-		
+		Vector2		Scale2;
 		Vector2		Translation;
 		Vector2		Anchor;
 		
-		public Transformer(Vector2 Translation,Vector2 Anchor,float Scale=1)
-		{
-			this.Translation = Translation;
-			this.Anchor = Anchor;
-			Scale1 = Scale;
-			Scale2 = null;
-		}
 		public Transformer(Vector2 Translation,Vector2 Anchor,Vector2 Scale)
 		{
 			this.Translation = Translation;
 			this.Anchor = Anchor;
-			Scale1 = null;
 			Scale2 = Scale;
 		}
 		
@@ -752,8 +771,6 @@ namespace PopLottie
 		{
 			if ( Scale2 is Vector2 s2 )
 				return s2;
-			if ( Scale1 is float s1 )
-				return new Vector2(s1,s1);
 			return Vector2.one;
 		} 
 		
@@ -901,18 +918,18 @@ namespace PopLottie
 	[Serializable]
 	public struct Root
 	{
-		public TimeSpan	FrameToTime(float Frame)
+		public TimeSpan	FrameToTime(FrameNumber Frame)
 		{
 			return TimeSpan.FromSeconds(Frame/ FramesPerSecond);
 		}
 		//	gr: output is really float, but trying int for simplicity for a moment...
-		public int		TimeToFrame(TimeSpan Time,bool Looped)
+		public FrameNumber		TimeToFrame(TimeSpan Time,bool Looped)
 		{
 			var Duration = this.Duration.TotalSeconds;
 			var TimeSecs = Looped ? TimeSpan.FromSeconds(Time.TotalSeconds % Duration) : TimeSpan.FromSeconds(Mathf.Min((float)Time.TotalSeconds,(float)Duration));
 			var Frame = (TimeSecs.TotalSeconds * FramesPerSecond);
 			//Frame += FirstKeyFrame;
-			return (int)Frame;
+			return (FrameNumber)Frame;
 		}
 		
 	
@@ -1125,11 +1142,14 @@ namespace PopLottie
 					}
 				}
 				
+				bool RenderGroupsAfter = true;
 				
 				Painter.BeginPath();
 				
 				foreach ( var Child in Children )
 				{
+					if ( Child is ShapeGroup && RenderGroupsAfter )
+						continue;
 					try
 					{
 						RenderChild(Child);
@@ -1142,6 +1162,20 @@ namespace PopLottie
 				ApplyStyle();
 				Painter.ClosePath();
 			
+				foreach ( var Child in Children )
+				{
+					if ( !(Child is ShapeGroup)  || !RenderGroupsAfter )
+						continue;
+					try
+					{
+						RenderChild(Child);
+					}
+					catch(Exception e)
+					{
+						Debug.LogException(e);
+					}
+				}
+
 				
 				if ( EnableDebug )
 				{

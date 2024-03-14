@@ -93,9 +93,9 @@ namespace PopLottie
 		
 		public Keyframed_FloatArray	k;	//	frames
 		
-		public float			GetValue(TimeSpan Time)
+		public float			GetValue(int Frame)
 		{
-			return k.GetValue(Time);
+			return k.GetValue(Frame);
 		}
 	}
 
@@ -312,10 +312,12 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public float GetValue(TimeSpan Time)
+		public float GetValue(int Frame)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
+			if ( Frames.Count > 1 )
+				Debug.Log($"todo pick frame({Frame}) from {Frames[0].t}...{Frames[Frames.Count-1].t}({Frames.Count})");
 			return Frames[0].GetValue(TimeSpan.Zero);
 		}
 	}
@@ -346,10 +348,12 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public float GetValue(TimeSpan Time)
+		public float GetValue(int Frame)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
+			if ( Frames.Count > 1 )
+				Debug.Log($"todo pick frame({Frame}) from {Frames[0].t}...{Frames[Frames.Count-1].t}({Frames.Count})");
 			return Frames[0].GetValue(TimeSpan.Zero);
 		}
 	}
@@ -362,9 +366,9 @@ namespace PopLottie
 		
 		public Keyframed_Float	k;	//	frames
 		
-		public float		GetValue(TimeSpan Time)
+		public float		GetValue(int Frame)
 		{
-			return k.GetValue(Time);
+			return k.GetValue(Frame);
 		}
 	}
 
@@ -381,7 +385,7 @@ namespace PopLottie
 		//	non animated
 		public float[]		k;	//	frames
 		
-		public Vector2		GetPosition(TimeSpan Time)
+		public Vector2		GetPosition(int Frame)
 		{
 			if ( k == null )
 				return Vector2.zero;
@@ -431,7 +435,7 @@ namespace PopLottie
 		public Bezier		k;	//	frames
 		public int			ix;	//	property index
 		
-		public Bezier		GetBezier(TimeSpan Time)
+		public Bezier		GetBezier(int Frame)
 		{
 			return k;
 		}
@@ -445,7 +449,7 @@ namespace PopLottie
 		public float[]		k;	//	4 elements 0..1
 		public int			ix;	//	property index
 		
-		public Color		GetColour(TimeSpan Time)
+		public Color		GetColour(int Frame)
 		{
 			if ( k.Length < 4 )
 				return Color.magenta;
@@ -467,11 +471,11 @@ namespace PopLottie
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
 		public AnimatedNumber	o;	//	opacity 0...100
 		
-		public Transformer		GetTransformer(TimeSpan Time)
+		public Transformer		GetTransformer(int Frame)
 		{
-			var Anchor = a.GetPosition(Time);
-			var Position = p.GetPosition(Time);
-			float Scale = s.GetValue(Time) / 100.0f;
+			var Anchor = a.GetPosition(Frame);
+			var Position = p.GetPosition(Frame);
+			float Scale = s.GetValue(Frame) / 100.0f;
 			return new Transformer(Position,Anchor,Scale);
 		}
 	}
@@ -587,16 +591,16 @@ namespace PopLottie
 		public AnimatedNumber	w;	//	width
 		public AnimatedNumber	Stroke_Width => w;
 		
-		public float			GetWidth(TimeSpan Time)
+		public float			GetWidth(int Frame)
 		{
-			var Value = w.GetValue(Time);
+			var Value = w.GetValue(Frame);
 			//	gr: it kinda looks like unity's width is radius, and lotties is diameter, as it's consistently a bit thick
 			Value *= 0.8f;
 			return Value;
 		}
-		public Color			GetColour(TimeSpan Time)
+		public Color			GetColour(int Frame)
 		{
-			return c.GetColour(Time);
+			return c.GetColour(Frame);
 		}
 	}
 		
@@ -611,11 +615,11 @@ namespace PopLottie
 		public AnimatedVector	s;	//	scale
 		//public AnimatedVector	r;	//	rotation
 		
-		public Transformer	GetTransformer(TimeSpan Time)
+		public Transformer	GetTransformer(int Frame)
 		{
-			var Anchor = a.GetPosition(Time);
-			var Position = p.GetPosition(Time);
-			var Scale = s.GetValue(Time) / 100.0f;
+			var Anchor = a.GetPosition(Frame);
+			var Position = p.GetPosition(Frame);
+			var Scale = s.GetValue(Frame) / 100.0f;
 			return new Transformer( Position, Anchor, Scale);
 		}
 	}
@@ -717,27 +721,27 @@ namespace PopLottie
 			}
 			return null;
 		}
-		public Transformer		GetTransformer(TimeSpan Time)
+		public Transformer		GetTransformer(int Frame)
 		{
 			var Transform = GetChild(ShapeType.Transform) as ShapeTransform;
 			if ( Transform == null )
 				return new Transformer();
-			return Transform.GetTransformer(Time);
+			return Transform.GetTransformer(Frame);
 		}
 		
-		public ShapeStyle		GetShapeStyle(TimeSpan Time)
+		public ShapeStyle		GetShapeStyle(int Frame)
 		{
 			var Fill = GetChild(ShapeType.Fill) as ShapeFillAndStroke;
 			var Stroke = GetChild(ShapeType.Stroke) as ShapeFillAndStroke;
 			var Style = new ShapeStyle();
 			if ( Fill != null )
 			{
-				Style.FillColour = Fill.GetColour(Time);
+				Style.FillColour = Fill.GetColour(Frame);
 			}
 			if ( Stroke != null )
 			{
-				Style.StrokeColour = Stroke.GetColour(Time);
-				Style.StrokeWidth = Stroke.GetWidth(Time);
+				Style.StrokeColour = Stroke.GetColour(Frame);
+				Style.StrokeWidth = Stroke.GetWidth(Frame);
 			}
 			return Style;
 		}
@@ -748,11 +752,11 @@ namespace PopLottie
 	[Serializable]
 	public struct LayerMeta	//	shape layer
 	{
-		public bool		IsVisible(TimeSpan Time)
+		public bool		IsVisible(int Frame)
 		{
-			if ( Time < FirstKeyframe )
+			if ( Frame < FirstKeyFrame )
 				return false;
-			if ( Time > LastKeyframe )
+			if ( Frame > LastKeyFrame )
 				return false;
 			/*
 			if ( Time < StartTime )
@@ -762,9 +766,9 @@ namespace PopLottie
 		}
 	
 		public float				ip;
-		public TimeSpan				FirstKeyframe => TimeSpan.FromSeconds(ip);	//	visible after this
+		public int					FirstKeyFrame => (int)ip;	//	visible after this
 		public float				op;	//	= 10
-		public TimeSpan				LastKeyframe => TimeSpan.FromSeconds(op);		//	invisible after this (time?)
+		public int					LastKeyFrame => (int)op;		//	invisible after this (time?)
 		
 		public String				nm;// = "Lottie File"
 		public String				Name => nm ?? "Unnamed";
@@ -806,13 +810,31 @@ namespace PopLottie
 	[Serializable]
 	public struct Root
 	{
+		public TimeSpan	FrameToTime(float Frame)
+		{
+			return TimeSpan.FromSeconds(Frame/ FramesPerSecond);
+		}
+		//	gr: output is really float, but trying int for simplicity for a moment...
+		public int		TimeToFrame(TimeSpan Time,bool Looped)
+		{
+			var Duration = this.Duration.TotalSeconds;
+			var TimeSecs = Looped ? TimeSpan.FromSeconds(Time.TotalSeconds % Duration) : TimeSpan.FromSeconds(Mathf.Min((float)Time.TotalSeconds,(float)Duration));
+			var Frame = (TimeSecs / FramesPerSecond).TotalSeconds;
+			Frame += FirstKeyFrame;
+			return (int)Frame;
+		}
+		
+	
 		public string	v;	//"5.9.2"
 		public float	fr;
-		public float	FrameRate => fr;
+		public float	FramesPerSecond => fr;
 		public float	ip;
-		public TimeSpan	FirstKeyframe => TimeSpan.FromSeconds(ip);
+		public int		FirstKeyFrame => (int)ip;
+		public TimeSpan	FirstKeyFrameTime => FrameToTime(FirstKeyFrame);
 		public float	op;	//	= 10
-		public TimeSpan	LastKeyframe => TimeSpan.FromSeconds(op);
+		public int		LastKeyFrame => (int)op;
+		public TimeSpan	LastKeyFrameTime => FrameToTime(LastKeyFrame);
+		public TimeSpan	Duration => LastKeyFrameTime - FirstKeyFrameTime;
 		public int		w;//: = 100
 		public int		h;//: = 100
 		public String	nm;// = "Lottie File"
@@ -850,7 +872,7 @@ namespace PopLottie
 			Debug.Log($"Decoded lottie ok x{lottie.layers.Length} layers");
 		}
 		
-		public TimeSpan Duration => lottie.LastKeyframe - lottie.FirstKeyframe;
+		public TimeSpan Duration => lottie.Duration;
 
 		public void Dispose()
 		{
@@ -869,7 +891,7 @@ namespace PopLottie
 		public void Render(TimeSpan PlayTime, Painter2D Painter,Rect ContentRect,bool EnableDebug)
 		{
 			//	get the time, move it to lottie-anim space and loop it
-			var Time = lottie.FirstKeyframe + TimeSpan.FromSeconds(PlayTime.TotalSeconds % this.Duration.TotalSeconds);
+			var Frame = lottie.TimeToFrame(PlayTime,Looped:true);
 			
 			//Debug.Log($"Time = {Time.TotalSeconds} ({lottie.FirstKeyframe.TotalSeconds}...{lottie.LastKeyframe.TotalSeconds})");
 		
@@ -892,9 +914,9 @@ namespace PopLottie
 				var Children = Group.Children;
 
 				//	elements (shapes) in the layer may be in the wrong order, so need to pre-extract style & transform
-				var GroupTransform = Group.GetTransformer(Time);
+				var GroupTransform = Group.GetTransformer(Frame);
 				GroupTransform = LayerTransform.Multiply(GroupTransform);
-				var GroupStyle = Group.GetShapeStyle(Time);
+				var GroupStyle = Group.GetShapeStyle(Frame);
 	
 				
 	
@@ -932,7 +954,7 @@ namespace PopLottie
 				
 					if ( Child is ShapePath path )
 					{
-						var Bezier = path.Path_Bezier.GetBezier(Time);
+						var Bezier = path.Path_Bezier.GetBezier(Frame);
 						var Points = Bezier.GetControlPoints();
 						void CurveToPoint(Bezier.ControlPoint Point,Bezier.ControlPoint PrevPoint)
 						{
@@ -980,8 +1002,8 @@ namespace PopLottie
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
-						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Time) );
-						var LocalCenter = ellipse.Center.GetPosition(Time);
+						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Frame) );
+						var LocalCenter = ellipse.Center.GetPosition(Frame);
 						var EllipseCenter = GroupTransform.LocalToWorld(LocalCenter);
 		
 						var Radius = EllipseSize;
@@ -1049,13 +1071,13 @@ namespace PopLottie
 			//	not sure if its the json parser, or the format (front to back), but we need to render back to front
 			foreach ( var Layer in lottie.layers.Reverse() )
 			{
-				if ( !Layer.IsVisible(Time) )
+				if ( !Layer.IsVisible(Frame) )
 					continue;
 				
-				var LayerTransform = Layer.Transform.GetTransformer(Time);
+				var LayerTransform = Layer.Transform.GetTransformer(Frame);
 				LayerTransform = RootTransformer.Multiply(LayerTransform);
-				
-				
+			
+
 				//	render the shape
 				foreach ( var Shape in Layer.Children )
 				{

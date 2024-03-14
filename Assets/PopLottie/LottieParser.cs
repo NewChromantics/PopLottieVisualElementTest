@@ -131,11 +131,17 @@ namespace PopLottie
 	
 	[Serializable] public struct Frame_Float
 	{
-		public ValueCurve	i;
-		public ValueCurve	o;
+		public ValueCurve	i;	//	ease in value
+		public ValueCurve	o;	//	ease out value
 		public float		t;	//	time
-		public float[]		s;	//	start value
-		public float[]		e;	//	end value
+		public float[]		s;	//	value at time
+		//public float[]		e;	//	end value
+		public int			Frame => (int)t;
+		
+		public float		LerpTo(Frame_Float Next,float Lerp)
+		{
+			return Mathf.Lerp( this.s[0], Next.s[0], Lerp );
+		}
 		
 		public float		GetValue(TimeSpan Time)
 		{
@@ -297,7 +303,7 @@ namespace PopLottie
 		{
 			var Frame = new Frame_Float();
 			Frame.s = new []{Number};
-			Frame.e = new []{Number};
+			//Frame.e = new []{Number};
 			AddFrame(Frame);
 		}
 
@@ -312,13 +318,34 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
+		(Frame_Float,float,Frame_Float) GetPrevNextFramesAtFrame(int TargetFrame)
+		{
+			if ( Frames == null || Frames.Count == 0 )
+				throw new Exception("Missing frames");
+			
+			//	find previous & next frames
+			var PrevIndex = 0;
+			for ( int f=0;	f<Frames.Count;	f++ )
+			{
+				var ThisFrame = Frames[f];
+				if ( ThisFrame.Frame > TargetFrame )
+					break;
+			}
+			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);
+			var Prev = Frames[PrevIndex];
+			var Next = Frames[NextIndex];
+			//	get the lerp(time) between prev & next
+			var Lerp = Mathf.InverseLerp( Prev.Frame, Next.Frame, TargetFrame );
+			return (Prev,Lerp,Next);
+		}
+		
 		public float GetValue(int Frame)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				return 1;
-			if ( Frames.Count > 1 )
-				Debug.Log($"todo pick frame({Frame}) from {Frames[0].t}...{Frames[Frames.Count-1].t}({Frames.Count})");
-			return Frames[0].GetValue(TimeSpan.Zero);
+				
+			var (Prev,Lerp,Next) = GetPrevNextFramesAtFrame(Frame);
+			return Prev.LerpTo( Next, Lerp );
 		}
 	}
 	
@@ -477,6 +504,13 @@ namespace PopLottie
 			var Position = p.GetPosition(Frame);
 			float Scale = s.GetValue(Frame) / 100.0f;
 			return new Transformer(Position,Anchor,Scale);
+		}
+		
+		//	returns 0-1
+		public float			GetOpacity(int Frame)
+		{
+			var Opacity = o.GetValue(Frame);
+			return Opacity / 100.0f;
 		}
 	}
 	
@@ -819,8 +853,8 @@ namespace PopLottie
 		{
 			var Duration = this.Duration.TotalSeconds;
 			var TimeSecs = Looped ? TimeSpan.FromSeconds(Time.TotalSeconds % Duration) : TimeSpan.FromSeconds(Mathf.Min((float)Time.TotalSeconds,(float)Duration));
-			var Frame = (TimeSecs / FramesPerSecond).TotalSeconds;
-			Frame += FirstKeyFrame;
+			var Frame = (TimeSecs.TotalSeconds * FramesPerSecond);
+			//Frame += FirstKeyFrame;
 			return (int)Frame;
 		}
 		
@@ -892,7 +926,11 @@ namespace PopLottie
 		{
 			//	get the time, move it to lottie-anim space and loop it
 			var Frame = lottie.TimeToFrame(PlayTime,Looped:true);
+			Render( Frame, Painter, ContentRect, EnableDebug );
+		}
 			
+		public void Render(int Frame, Painter2D Painter,Rect ContentRect,bool EnableDebug)
+		{
 			//Debug.Log($"Time = {Time.TotalSeconds} ({lottie.FirstKeyframe.TotalSeconds}...{lottie.LastKeyframe.TotalSeconds})");
 		
 			var width = ContentRect.width;
@@ -1076,7 +1114,11 @@ namespace PopLottie
 				
 				var LayerTransform = Layer.Transform.GetTransformer(Frame);
 				LayerTransform = RootTransformer.Multiply(LayerTransform);
-			
+				var LayerOpacity = Layer.Transform.GetOpacity(Frame);
+				
+				//	skip hidden layers
+				if ( LayerOpacity <= 0 )
+					continue;
 
 				//	render the shape
 				foreach ( var Shape in Layer.Children )

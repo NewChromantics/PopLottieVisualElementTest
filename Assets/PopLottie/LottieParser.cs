@@ -592,6 +592,7 @@ namespace PopLottie
 		Group,
 		Path,
 		Ellipse,
+		TrimPath,		//	path trimmer, to modify (trim) a sibling shape
 	}
 	
 	public class ShapeSpecificMeta
@@ -636,6 +637,10 @@ namespace PopLottie
 			{
 				ShapeBase = ShapeObject.ToObject<ShapePath>(serializer);
 			}
+			else if ( ShapeBase.Type == ShapeType.TrimPath )
+			{
+				ShapeBase = ShapeObject.ToObject<ShapeTrimPath>(serializer);
+			}
 
 			existingValue.TheShape = ShapeBase;
 			return existingValue;
@@ -672,6 +677,7 @@ namespace PopLottie
 			"tr" => ShapeType.Transform,
 			"st" => ShapeType.Stroke,
 			"el" => ShapeType.Ellipse,
+			"tm" => ShapeType.TrimPath,
 			_ => throw new Exception($"Unknown type {ty}")
 		};
 	}
@@ -680,6 +686,15 @@ namespace PopLottie
 	{
 		public AnimatedBezier	ks;	//	bezier for path
 		public AnimatedBezier	Path_Bezier => ks;
+	}
+	
+	[Serializable] public class ShapeTrimPath : Shape
+	{
+		public AnimatedNumber	s;	//	segment start
+		public AnimatedNumber	e;	//	segment end
+		public AnimatedNumber	o;	//	offset
+		public int				m;
+		public int				TrimMultipleShapes => m;
 	}
 		
 				

@@ -486,30 +486,6 @@ namespace PopLottie
 			return k.GetValue(Frame,Default);
 		}
 	}
-
-
-	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/
-	[Serializable] public struct AnimatedPosition
-	{
-		public int			a;
-		public bool			Animated => a!=0;
-		public int			ix;	//	property index
-
-		//	animated
-		//public Keyframe2[]	k;	//	frames
-		//	non animated
-		public Keyframed_FloatArray		k;	//	frames
-		
-		public Vector2		GetPosition(FrameNumber Frame)
-		{
-			var Default = new float[]{0,0};
-			var Output = k.GetValue(Frame,Default);
-			if ( Output.Length < 2 )
-				return Vector2.zero;
-			return new Vector2(Output[0],Output[1]);
-		}
-	}
-	
 	
 	
 	[Serializable] public struct Bezier
@@ -585,15 +561,15 @@ namespace PopLottie
 		public float	sa;	//	Direction at which skew is applied, in degrees (0 skews along the X axis, 90 along the Y axis)
 		*/
 		public AnimatedVector	s;	//	scale factor, 100=no scaling
-		public AnimatedPosition	a;	//	anchor point
-		public AnimatedPosition	p;	//	position/translation
+		public AnimatedVector	a;	//	anchor point
+		public AnimatedVector	p;	//	position/translation
 		//public AnimatedNumber	r;	//	rotation in degrees clockwise
 		public AnimatedNumber	o;	//	opacity 0...100
 		
 		public Transformer		GetTransformer(FrameNumber Frame)
 		{
-			var Anchor = a.GetPosition(Frame);
-			var Position = p.GetPosition(Frame);
+			var Anchor = a.GetValue(Frame,Vector2.zero);
+			var Position = p.GetValue(Frame,Vector2.zero);
 			var FullScale = new Vector2(100,100);
 			var Scale = s.GetValue(Frame,Default:FullScale) /FullScale;
 			return new Transformer(Position,Anchor,Scale);
@@ -779,9 +755,9 @@ namespace PopLottie
 	[Serializable] public class ShapeEllipse : Shape 
 	{
 		public AnimatedVector	s;
-		public AnimatedPosition	p;
+		public AnimatedVector	p;
 		public AnimatedVector	Size => s;	
-		public AnimatedPosition	Center => p;	
+		public AnimatedVector	Center => p;	
 		
 	}
 	
@@ -1162,7 +1138,7 @@ namespace PopLottie
 					if ( Child is ShapeEllipse ellipse )
 					{
 						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Frame,Default:10) );
-						var LocalCenter = ellipse.Center.GetPosition(Frame);
+						var LocalCenter = ellipse.Center.GetValue(Frame,Vector2.zero);
 						var EllipseCenter = GroupTransform.LocalToWorld(LocalCenter);
 		
 						var Radius = EllipseSize;

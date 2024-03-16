@@ -114,7 +114,7 @@ namespace PopLottie
 		
 		public TimeSpan GetTime()
 		{
-			return TimeSpan.FromSeconds( Time.time );
+			return TimeSpan.FromSeconds( Time.realtimeSinceStartup );
 		}
 		
 	
@@ -147,10 +147,10 @@ namespace PopLottie
 				return;
 			}
 			
-			//var Time = GetTime();
-			//_lottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
-			FrameNumber = (FrameNumber+1.001f) % (float)_lottieAnimation.FrameCount;
-			_lottieAnimation.Render( FrameNumber, context.painter2D, contentRect, enableDebug );
+			var Time = GetTime();
+			_lottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
+			//FrameNumber = (FrameNumber+1.001f) % (float)_lottieAnimation.FrameCount;
+			//_lottieAnimation.Render( FrameNumber, context.painter2D, contentRect, enableDebug );
 		}
 		float FrameNumber = 0;
 

@@ -198,7 +198,7 @@ namespace PopLottie
 				return null;
 		
 			//	lerp each member
-			var Values = s;
+			var Values = new float[s.Length];
 			for ( int i=0;	i<Values.Length;	i++ )
 				Values[i] = Mathf.Lerp( this.s[i], Next.s[i], Lerp );
 			return Values;

@@ -241,8 +241,30 @@ namespace PopLottie
 		}
 	}
 	
+	
+	
 	class KeyframedConvertor<KeyFramedType,FrameType> : JsonConverter<KeyFramedType> where KeyFramedType : IKeyframed<FrameType>
 	{
+		static float GetValue(JToken Value)
+		{
+			if ( Value.Type == JTokenType.Integer )
+				return (long)Value;
+			if ( Value.Type == JTokenType.Float )
+				return (float)Value;
+			throw new Exception("Got javascript value which isnt a number");
+		}
+		
+		static List<float> GetValues(JArray ArrayOfNumbers)
+		{
+			var Numbers = new List<float>();
+			foreach ( var Value in ArrayOfNumbers )
+			{
+				var ValueNumber = GetValue(Value);
+				Numbers.Add(ValueNumber);
+			}
+			return Numbers;
+		}
+		
 		public override void WriteJson(JsonWriter writer, KeyFramedType value, JsonSerializer serializer) { throw new NotImplementedException(); }
 		public override KeyFramedType ReadJson(JsonReader reader, Type objectType, KeyFramedType existingValue, bool hasExistingValue,JsonSerializer serializer)
 		{
@@ -254,29 +276,30 @@ namespace PopLottie
 			else if ( reader.TokenType == JsonToken.StartArray )
 			{
 				var ThisArray = JArray.Load(reader);
-				foreach ( var Frame in ThisArray )
+				
+				//	if this is an array of objects, it's an array of frames
+				//	if not, this might just be a single frame of values
+				var Element0 = ThisArray[0];
+				if ( Element0.Type == JTokenType.Array || Element0.Type == JTokenType.Object )
 				{
-					var FrameReader = new JTokenReader(Frame);
-					
-					//	might be an array of numbers
-					if ( Frame.Type == JTokenType.Integer || Frame.Type == JTokenType.Float )
+					foreach ( var Frame in ThisArray )
 					{
-						var Value = Frame;
-						var Number = (reader.TokenType == JsonToken.Integer) ? (long)Value : (float)Value;
-						existingValue.AddFrame(Number);
-					}
-					else
-					{
+						var FrameReader = new JTokenReader(Frame);
 						var FrameObject = JObject.Load(FrameReader);
 						existingValue.AddFrame( FrameObject, serializer );
 					}
+				}
+				else
+				{
+					//	this is an array of values, so one frame
+					existingValue.AddFrame(GetValues(ThisArray).ToArray());
 				}
 			}
 			else if ( reader.TokenType == JsonToken.Integer || reader.TokenType == JsonToken.Float )
 			{
 				var Value = reader.Value;
 				var Number = (reader.TokenType == JsonToken.Integer) ? (long)Value : (float)Value;
-				existingValue.AddFrame(Number);
+				existingValue.AddFrame(new float[]{Number});
 			}
 			else 
 			{
@@ -292,7 +315,7 @@ namespace PopLottie
 	{
 		public void AddFrame(JObject Object,JsonSerializer Serializer);
 		public void AddFrame(T Frame);
-		public void AddFrame(float Number);
+		public void AddFrame(float[] Values);
 	}
 	
 	//	make this generic
@@ -304,9 +327,9 @@ namespace PopLottie
 		
 		List<Frame_Vector2>		Frames;
 		
-		public void AddFrame(float Number)
+		public void AddFrame(float[] Numbers)
 		{
-			throw new Exception($"Vector2 should not be constructed from just a number ({Number})");
+			throw new Exception($"todo: vector2 from {Numbers}");
 		}
 
 		public void AddFrame(JObject Object,JsonSerializer Serializer)
@@ -380,11 +403,11 @@ namespace PopLottie
 	{
 		List<Frame_Float>		Frames;
 
-		public void AddFrame(float Number)
+		public void AddFrame(float[] Values)
 		{
 			var Frame = new Frame_Float();
-			Frame.s = new []{Number};
-			//Frame.e = new []{Number};
+			Frame.s = Values;
+			Frame.t = -123;
 			AddFrame(Frame);
 		}
 
@@ -416,10 +439,11 @@ namespace PopLottie
 	{
 		List<Frame_FloatArray>		Frames;
 
-		public void AddFrame(float Number)
+		public void AddFrame(float[] Numbers)
 		{
 			var Frame = new Frame_FloatArray();
-			Frame.s = new []{Number};
+			Frame.s = Numbers;
+			Frame.t = -123;	//	if being added here, it shouldnt be keyframed
 			//Frame.e = new []{Number};
 			AddFrame(Frame);
 		}
@@ -474,14 +498,15 @@ namespace PopLottie
 		//	animated
 		//public Keyframe2[]	k;	//	frames
 		//	non animated
-		public float[]		k;	//	frames
+		public Keyframed_FloatArray		k;	//	frames
 		
 		public Vector2		GetPosition(FrameNumber Frame)
 		{
-			if ( k == null )
+			var Default = new float[]{0,0};
+			var Output = k.GetValue(Frame,Default);
+			if ( Output.Length < 2 )
 				return Vector2.zero;
-				
-			return new Vector2( k[0], k[1] );
+			return new Vector2(Output[0],Output[1]);
 		}
 	}
 	

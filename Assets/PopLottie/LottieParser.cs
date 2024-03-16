@@ -750,8 +750,8 @@ namespace PopLottie
 	[Serializable] public class ShapeTransform : Shape 
 	{
 		//	transform
-		public AnimatedPosition	p;	//	translation
-		public AnimatedPosition	a;	//	anchor
+		public AnimatedVector	p;	//	translation
+		public AnimatedVector	a;	//	anchor
 		
 		//	gr: not parsing as mix of animated & not
 		public AnimatedVector	s;	//	scale
@@ -760,8 +760,8 @@ namespace PopLottie
 		
 		public Transformer	GetTransformer(FrameNumber Frame)
 		{
-			var Anchor = a.GetPosition(Frame);
-			var Position = p.GetPosition(Frame);
+			var Anchor = a.GetValue(Frame,Vector2.zero);
+			var Position = p.GetValue(Frame,Vector2.zero);
 			var FullScale = new Vector2(100,100);
 			var Scale = s.GetValue(Frame,Default:FullScale) /FullScale;
 			return new Transformer( Position, Anchor, Scale);

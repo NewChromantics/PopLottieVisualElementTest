@@ -542,11 +542,12 @@ namespace PopLottie
 		
 		public Color		GetColour(FrameNumber Frame)
 		{
-			if ( k.Length < 4 )
-				return Color.magenta;
 			if ( Animated )
-				Debug.Log($"not animating colour");
-			return new Color(k[0],k[1],k[2],k[3]);
+				Debug.Log($"todo: animating colour");
+			var Alpha = k.Length == 4 ? k[3] : 1;
+			if ( k.Length < 3 )
+				return Color.magenta;
+			return new Color(k[0],k[1],k[2],Alpha);
 		}
 	}
 

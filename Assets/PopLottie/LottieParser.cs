@@ -770,55 +770,57 @@ namespace PopLottie
 		public bool		IsFilled => FillColour.HasValue;
 	}
 
-	//	also for layers, but can't call this Transform
-	public struct Transformer
+
+	//	struct ideally, but to include pointer to parent, can't be a struct
+	public class Transformer
 	{
-		Vector2		Scale2;
-		Vector2		Translation;
-		Vector2		Anchor;
+		public Transformer	Parent = null;
+		Vector2				Scale = Vector2.one;
+		Vector2				Translation;
+		Vector2				Anchor;
+		
+		public Transformer()
+		{
+		}
 		
 		public Transformer(Vector2 Translation,Vector2 Anchor,Vector2 Scale)
 		{
 			this.Translation = Translation;
 			this.Anchor = Anchor;
-			Scale2 = Scale;
+			this.Scale = Scale;
+			this.Parent = null;
 		}
-		
-		Vector2		GetScale()
+
+		Vector2	LocalToParent(Vector2 LocalPosition)
 		{
-			if ( Scale2 is Vector2 s2 )
-				return s2;
-			return Vector2.one;
-		} 
+			//	0,0 anchor and 0,0 translation is topleft
+			//	20,0 anchor and 0,0 position, makes 0,0 offscreen (-20,0) 
+			//	anchor 20, pos 100, makes 0,0 at 80,0
+			//	scale applies after offset
+			LocalPosition -= Anchor;
+			//	apply rotation here
+			LocalPosition *= Scale;
+			LocalPosition += Translation;
+			return LocalPosition;
+		}
 		
 		public Vector2	LocalToWorld(Vector2 LocalPosition)
 		{
-			//	gr: this needs to use anchor
-			LocalPosition += Translation;
-			LocalPosition -= Anchor;
-			LocalPosition *= GetScale();
-			//	rotate here
-			LocalPosition += Anchor;
-			
-			return LocalPosition;
+			var ParentPosition = LocalToParent(LocalPosition);
+			var WorldPosition = ParentPosition;
+			if ( Parent is Transformer parent )
+			{
+				WorldPosition = parent.LocalToWorld(ParentPosition);
+			}
+			return WorldPosition;
 		}
 		
 		public float	LocalToWorld(float LocalSize)
 		{
-			LocalSize *= GetScale().x;
+			LocalSize *= Scale.x;
 			return LocalSize;
 		}
 		
-		//	gr: might all be simpler if we generate a 2D matrix...
-		public Transformer	Multiply(Transformer ChildTransform)
-		{
-			var NewTransform = ChildTransform;
-			NewTransform.Translation += this.Translation;
-			var ThisScale = GetScale();
-			var ChildScale = ChildTransform.GetScale();
-			NewTransform.Scale2 = ChildScale *ThisScale;
-			return NewTransform;
-		}
 	}
 
 	[Serializable] public class ShapeGroup: Shape 
@@ -901,12 +903,14 @@ namespace PopLottie
 		public String				refId;
 		public String				ResourceId => refId ?? "";
 		public int					ind;
-		public int					LayerId => ind;
+		public int					LayerId => ind;	//	for parenting
+		public int?					parent;
+		
 		public float				st;
 		public double				StartTime => st;
 
-		public int					ddd;	//	something to do with winding
-		public int					parent;
+		public int					ddd;
+		public bool					ThreeDimensions => ddd == 3;
 		public int					ty;
 		public int					sr;
 		public TransformMeta		ks;
@@ -1038,14 +1042,14 @@ namespace PopLottie
 			var ScaleToCanvas = Stretch ? new Vector2( ScaleToCanvasWidth, ScaleToCanvasHeight ) : new Vector2( ScaleToCanvasUniform, ScaleToCanvasUniform );
 			Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, ScaleToCanvas );
 
-			void RenderGroup(ShapeGroup Group,Transformer LayerTransform,float LayerAlpha)
+			void RenderGroup(ShapeGroup Group,Transformer ParentTransform,float LayerAlpha)
 			{
 				//	run through sub shapes
 				var Children = Group.Children;
 
 				//	elements (shapes) in the layer may be in the wrong order, so need to pre-extract style & transform
 				var GroupTransform = Group.GetTransformer(Frame);
-				GroupTransform = LayerTransform.Multiply(GroupTransform);
+				GroupTransform.Parent = ParentTransform;
 				var GroupStyle = Group.GetShapeStyle(Frame);
 				var GroupAlpha = Group.GetAlpha(Frame);
 				GroupAlpha *= LayerAlpha;
@@ -1160,7 +1164,7 @@ namespace PopLottie
 				}
 				
 				bool RenderGroupsAfter = true;
-				
+
 				Painter.BeginPath();
 				
 				foreach ( var Child in Children )
@@ -1226,8 +1230,24 @@ namespace PopLottie
 				if ( !Layer.IsVisible(Frame) )
 					continue;
 				
+				Transformer ParentTransformer = RootTransformer;	
+				if ( Layer.parent.HasValue )
+				{
+					var ParentLayers = lottie.layers.Where( l => l.LayerId == Layer.parent.Value ).ToArray();
+					if ( ParentLayers.Length != 1 )
+					{
+						Debug.LogWarning($"Too few or too many parent layers for {Layer.Name} (parent={Layer.parent})");
+					}
+					else
+					{
+						var ParentLayerTransform = ParentLayers[0].Transform.GetTransformer(Frame);
+						ParentLayerTransform.Parent = ParentTransformer;
+						ParentTransformer = ParentLayerTransform; 
+					}
+				}
+				
 				var LayerTransform = Layer.Transform.GetTransformer(Frame);
-				LayerTransform = RootTransformer.Multiply(LayerTransform);
+				LayerTransform.Parent = ParentTransformer;
 				var LayerOpacity = Layer.Transform.GetOpacity(Frame);
 				
 				//	skip hidden layers

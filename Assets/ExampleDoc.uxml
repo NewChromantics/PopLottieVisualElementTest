@@ -2,5 +2,5 @@
     <Studio5UI.AnimatedImageElement animatedImageResourceUrl="Fruit.lottie.pretty" animEnabled="false" name="AnimatedImageElement" style="flex-grow: 1; background-color: rgb(224, 45, 189);" />
     <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="TestSquare_Static.lottie" enableDebug="true" style="background-color: rgba(188, 125, 13, 0.09); flex-grow: 1; display: none;" />
     <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="TestSquare_Moving.lottie" enableDebug="true" focusable="false" style="background-color: rgba(188, 125, 13, 0.09); flex-grow: 1; display: flex;" />
-    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="Fruit.lottie.pretty" enableDebug="true" style="background-color: rgba(188, 125, 13, 0.09); flex-grow: 1; display: none;" />
+    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="Fruit.lottie.pretty" enableDebug="true" name="LottieVisualElement" style="background-color: rgba(188, 125, 13, 0.09); flex-grow: 1; display: flex;" />
 </ui:UXML>

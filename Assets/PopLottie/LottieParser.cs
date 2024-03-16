@@ -1028,19 +1028,44 @@ namespace PopLottie
 		public void Render(FrameNumber Frame, Painter2D Painter,Rect ContentRect,bool EnableDebug)
 		{
 			//Debug.Log($"Time = {Time.TotalSeconds} ({lottie.FirstKeyframe.TotalSeconds}...{lottie.LastKeyframe.TotalSeconds})");
-		
-			var width = ContentRect.width;
-			var height = ContentRect.height;
+
+			//	work out the placement of the canvas - all the shapes are in THIS canvas space
+			Rect LottieCanvasRect = new Rect(0,0,lottie.w,lottie.h);
+
+			void DrawRect(Rect rect,Color colour,Transformer transform=null)
+			{
+				transform = transform ?? new Transformer();
+				var a = transform.LocalToWorld( new Vector2(rect.xMin,rect.yMin) );
+				var b = transform.LocalToWorld( new Vector2(rect.xMax,rect.yMin) );
+				var c = transform.LocalToWorld( new Vector2(rect.xMax,rect.yMax) );
+				var d = transform.LocalToWorld( new Vector2(rect.xMin,rect.yMax) );
+				Painter.BeginPath();
+				Painter.MoveTo( a );
+				Painter.LineTo( b );
+				Painter.LineTo( c );
+				Painter.LineTo( d );
+				Painter.ClosePath();
+				Painter.fillColor = colour;
+				Painter.Fill();
+			}
 			
 			//	scale-to-canvas transformer
 			float ExtraScale = 1;	//	for debug zooming
 			var ScaleToCanvasWidth = (ContentRect.width / lottie.w)*ExtraScale;
 			var ScaleToCanvasHeight = (ContentRect.height / lottie.h)*ExtraScale;
 			bool Stretch = false;
-			bool FitHeight = false;
+			bool FitHeight = true;
 			var ScaleToCanvasUniform = FitHeight ? ScaleToCanvasHeight : ScaleToCanvasWidth;
 			var ScaleToCanvas = Stretch ? new Vector2( ScaleToCanvasWidth, ScaleToCanvasHeight ) : new Vector2( ScaleToCanvasUniform, ScaleToCanvasUniform );
-			Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, ScaleToCanvas );
+			
+			//	gr: work this out properly....
+			//		
+			Transformer RootTransformer = new Transformer( ContentRect.min, Vector2.zero, ScaleToCanvas );
+			//Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, Vector2.one);
+			if ( EnableDebug )
+				DrawRect(LottieCanvasRect, new Color(0,1,1,0.1f), RootTransformer );
+				
+			
 
 			void RenderGroup(ShapeGroup Group,Transformer ParentTransform,float LayerAlpha)
 			{

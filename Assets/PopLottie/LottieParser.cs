@@ -511,39 +511,6 @@ namespace PopLottie
 		}
 	}
 
-	
-	[Serializable] public struct TransformMeta
-	{
-	/*
-		public float	r;	//	rotation in degrees clockwise
-		public float	sk;	//	skew angle degrees
-		public float	sa;	//	Direction at which skew is applied, in degrees (0 skews along the X axis, 90 along the Y axis)
-		*/
-		public AnimatedVector	s;	//	scale factor, 100=no scaling
-		public AnimatedVector	a;	//	anchor point
-		public AnimatedVector	p;	//	position/translation
-		//public AnimatedNumber	r;	//	rotation in degrees clockwise
-		public AnimatedNumber	o;	//	opacity 0...100
-		
-		public Transformer		GetTransformer(FrameNumber Frame)
-		{
-			var Anchor = a.GetValue(Frame,Vector2.zero);
-			var Position = p.GetValue(Frame,Vector2.zero);
-			var FullScale = new Vector2(100,100);
-			var Scale = s.GetValue(Frame,Default:FullScale) /FullScale;
-			return new Transformer(Position,Anchor,Scale);
-		}
-		
-		//	returns 0-1
-		public float			GetOpacity(FrameNumber Frame)
-		{
-			var Opacity = o.GetValue(Frame,Default:100);
-			return Opacity / 100.0f;
-		}
-	}
-	
-	
-	
 	public enum ShapeType
 	{
 		Fill,
@@ -883,8 +850,8 @@ namespace PopLottie
 		public bool					ThreeDimensions => ddd == 3;
 		public int					ty;
 		public int					sr;
-		public TransformMeta		ks;
-		public TransformMeta		Transform=>ks;
+		public ShapeTransform		ks;
+		public ShapeTransform		Transform=>ks;	//	gr: this is not really a shape, but has same properties & interface (all the derived parts in ShapeTransform)
 		public int					ao;
 		public bool					AutoOrient => ao != 0;
 		public ShapeWrapper[]		shapes;
@@ -1244,7 +1211,7 @@ namespace PopLottie
 				
 				var LayerTransform = Layer.Transform.GetTransformer(Frame);
 				LayerTransform.Parent = ParentTransformer;
-				var LayerOpacity = Layer.Transform.GetOpacity(Frame);
+				var LayerOpacity = Layer.Transform.GetAlpha(Frame);
 				
 				//	skip hidden layers
 				if ( LayerOpacity <= 0 )

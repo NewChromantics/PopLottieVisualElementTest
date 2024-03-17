@@ -183,6 +183,8 @@ namespace PopLottie
 	{
 		public ValueCurve	i;
 		public ValueCurve	o;
+		public int			h;
+		public bool			HoldingFrame => h!=0;
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value

@@ -244,11 +244,21 @@ namespace PopLottie
 		public FrameNumber		Frame { get;}
 		public bool				IsTerminatingFrame {get;}	//	if this frame is just an end frame with no values, we wont try and read them
 		
-		//	https://github.com/NewChromantics/PopToaster/blob/f30bc186a9df993a4c856ee71b79ef88081203a5/PopEngine/Math.js#L1420
 		//	p0 = start, p1 = control/easing in, p2 = control/easing out, p3 = end
 		static Vector2 GetBezierValue(Vector2 p0,Vector2 p1,Vector2 p2,Vector2 p3,float Time)
 		{
 			float t = Time;
+			
+			//	https://morethandev.hashnode.dev/demystifying-the-cubic-bezier-function-ft-javascript
+			return (1 - t) * (1 - t) * (1 - t) * p0
+					+
+					3 * (1 - t) * (1 - t) * t * p1
+					+
+					3 * (1 - t) * t * t * p2
+					+
+					t * t * t * p3;
+			
+			//	https://github.com/NewChromantics/PopToaster/blob/f30bc186a9df993a4c856ee71b79ef88081203a5/PopEngine/Math.js#L1420
 			var OneMinusTcu = (1-t) * (1-t) * (1-t);
 			var OneMinusTsq = (1-t) * (1-t);
 			var Tsq = t*t;

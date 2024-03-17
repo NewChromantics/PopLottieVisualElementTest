@@ -78,14 +78,6 @@ namespace PopLottie
 		}
 	}
 	
-	[Serializable] public struct KeyframeFloats
-	{
-		public ValueCurve	i;
-		public ValueCurve	o;
-		public float		t;	//	time
-		public float[]		s;	//	start value
-		public float[]		e;	//	end value
-	}
 	
 	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/
 	[Serializable] public class AnimatedVector

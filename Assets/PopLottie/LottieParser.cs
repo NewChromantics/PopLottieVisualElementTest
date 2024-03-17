@@ -877,7 +877,7 @@ namespace PopLottie
 			var Duration = this.Duration.TotalSeconds;
 			var TimeSecs = Looped ? TimeSpan.FromSeconds(Time.TotalSeconds % Duration) : TimeSpan.FromSeconds(Mathf.Min((float)Time.TotalSeconds,(float)Duration));
 			var Frame = (TimeSecs.TotalSeconds * FramesPerSecond);
-			//Frame += FirstKeyFrame;
+			Frame += FirstKeyFrame;
 			return (FrameNumber)Frame;
 		}
 		

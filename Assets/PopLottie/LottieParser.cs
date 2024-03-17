@@ -157,26 +157,6 @@ namespace PopLottie
 
 	
 	
-	//	make this generic too
-	[Serializable] public struct Frame_Vector2 : IFrame
-	{
-		public Float2		i;	//	ease
-		public Float2		o;	//	ease out
-		public float		t;	//	time
-		public float[]		s;	//	value at time
-		//public float[]		e;	//	end value
-		public FrameNumber	Frame => t;	
-		
-		public Float2		LerpTo(Frame_Vector2 Next,float Lerp)
-		{
-			//	lerp each member
-			Float2 Values;
-			Values.x = new float[]{ Mathf.Lerp( this.s[0], Next.s[0], Lerp ) };
-			Values.y = new float[]{ Mathf.Lerp( this.s[1], Next.s[1], Lerp ) };
-			return Values;
-		}
-	}
-	
 	[Serializable] public struct Frame_Float : IFrame
 	{
 		public ValueCurve	i;	//	ease in value

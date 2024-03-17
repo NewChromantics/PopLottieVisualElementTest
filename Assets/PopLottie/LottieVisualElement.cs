@@ -93,7 +93,7 @@ namespace PopLottie
 			generateVisualContent += GenerateVisualContent;
 			
 			//	auto play by repainting this element (RIP child elements)
-			var FrameDeltaMs = 30;
+			var FrameDeltaMs = 5;
 			this.schedule.Execute( MarkDirtyRepaint ).Every(FrameDeltaMs);
 		}
 		

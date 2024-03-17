@@ -169,13 +169,25 @@ namespace PopLottie
 		
 		public float		LerpTo(Frame_Float Next,float Lerp,float Default)
 		{
-			//	gr: find out when these are missing (bad parse, or end?)
-			if ( Next.s == null )
-				Next = this;
-			if ( this.s == null )
+			float[] NextValues = Next.s;
+			float[] PrevValues = this.s;
+
+			//	this happens on terminator frames
+			if ( NextValues == null )
+				if ( this.e != null )
+					NextValues = this.e;
+
+			if ( NextValues == null )
+				NextValues = PrevValues;
+
+			if ( PrevValues == null || NextValues == null )
 				return Default;
-				
-			return Mathf.Lerp( this.s[0], Next.s[0], Lerp );
+		
+			//	lerp each member
+			var Values = new float[s.Length];
+			for ( int i=0;	i<Values.Length;	i++ )
+				Values[i] = Mathf.Lerp( PrevValues[i], NextValues[i], Lerp );
+			return Values[0];
 		}
 		
 	}
@@ -193,16 +205,24 @@ namespace PopLottie
 			
 		public float[]		LerpTo(Frame_FloatArray Next,float Lerp)
 		{
-			//	gr: find out why this is missing values
-			if ( Next.s == null )
-				Next = this;
-			if ( this.s == null )
+			float[] NextValues = Next.s;
+			float[] PrevValues = this.s;
+
+			//	this happens on terminator frames
+			if ( NextValues == null )
+				if ( this.e != null )
+					NextValues = this.e;
+
+			if ( NextValues == null )
+				NextValues = PrevValues;
+
+			if ( PrevValues == null || NextValues == null )
 				return null;
 		
 			//	lerp each member
 			var Values = new float[s.Length];
 			for ( int i=0;	i<Values.Length;	i++ )
-				Values[i] = Mathf.Lerp( this.s[i], Next.s[i], Lerp );
+				Values[i] = Mathf.Lerp( PrevValues[i], NextValues[i], Lerp );
 			return Values;
 		}
 	}

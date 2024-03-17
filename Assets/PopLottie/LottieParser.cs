@@ -165,6 +165,7 @@ namespace PopLottie
 		public float[]		s;	//	value at time
 		public float[]		e;	//	end value
 		public FrameNumber	Frame => t;
+		public bool			IsTerminatingFrame => s==null;
 		
 		public float		LerpTo(Frame_Float Next,float Lerp,float Default)
 		{
@@ -185,8 +186,8 @@ namespace PopLottie
 		public float		t;	//	time
 		public float[]		s;	//	start value
 		public float[]		e;	//	end value
-		public FrameNumber Frame	=> t;
-
+		public FrameNumber	Frame	=> t;
+		public bool			IsTerminatingFrame => s==null;
 			
 		public float[]		LerpTo(Frame_FloatArray Next,float Lerp)
 		{
@@ -284,6 +285,7 @@ namespace PopLottie
 	public interface IFrame
 	{
 		public FrameNumber		Frame { get;}
+		public bool				IsTerminatingFrame {get;}	//	if this frame is just an end frame with no values, we wont try and read them
 		
 		static (FRAMETYPE,float,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,FrameNumber TargetFrame) where FRAMETYPE : IFrame
 		{
@@ -299,6 +301,9 @@ namespace PopLottie
 			{
 				var ThisFrame = Frames[f];
 				if ( ThisFrame.Frame > TargetFrame )
+					break;
+				//	terminating frames have no values
+				if ( ThisFrame.IsTerminatingFrame )
 					break;
 				//if ( ThisFrame.Frame >= TargetFrame ) break;
 				PrevIndex = f;

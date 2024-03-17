@@ -109,7 +109,7 @@ namespace PopLottie
 			{
 				return x.GetValue(Frame,DefaultArray)[0];
 			}
-			return k.GetValue(Frame,DefaultArray)[0];
+			return k.GetValue(Frame)[0];
 		}
 		
 		
@@ -121,16 +121,16 @@ namespace PopLottie
 				var v1 = y.GetValue(Frame,Default)[0];
 				return new []{v0,v1};
 			}
-			return k.GetValue(Frame,Default);
+			return k.GetValue(Frame);
 		}
 		
 		public Vector2			GetValue(FrameNumber Frame,Vector2 Default)
 		{
 			var Default2 = new float[]{Default.x,Default.y};
 			var Values = GetValue(Frame,Default2);
-			if ( Values.Length == 0 )
-				return Default;
-				
+			if ( Values == null || Values.Length == 0 )
+				throw new Exception($"{GetType().Name}::GetValue(vec2) missing frames"); 
+
 			//	1D scale... usually
 			if ( Values.Length == 1 )
 				return new Vector2(Values[0],Values[0]);
@@ -181,8 +181,8 @@ namespace PopLottie
 				NextValues = PrevValues;
 
 			if ( PrevValues == null || NextValues == null )
-				return Default;
-		
+				throw new Exception($"{GetType().Name}::Lerp prev or next frame values"); 
+
 			//	lerp each member
 			var Values = new float[s.Length];
 			for ( int i=0;	i<Values.Length;	i++ )
@@ -312,7 +312,7 @@ namespace PopLottie
 		static (FRAMETYPE,float,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,FrameNumber TargetFrame) where FRAMETYPE : IFrame
 		{
 			if ( Frames == null || Frames.Count == 0 )
-				throw new Exception("Missing frames");
+				throw new Exception("GetPrevNextFramesAtFrame missing frames");
 			
 			if ( Frames.Count == 1 )
 				return (Frames[0],0,Frames[0]);
@@ -384,7 +384,7 @@ namespace PopLottie
 		public float GetValue(FrameNumber Frame,float Default)
 		{
 			if ( Frames == null || Frames.Count == 0 )
-				return Default;
+				throw new Exception($"{GetType().Name}::GetValue missing frames"); 
 				
 			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
 			return Prev.LerpTo( Next, Lerp, Default );
@@ -418,16 +418,16 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		//	default = hack whilst developing
-		public float[] GetValue(FrameNumber Frame,float[] Default)
+		public float[] GetValue(FrameNumber Frame)
 		{
 			if ( Frames == null || Frames.Count == 0 )
-				return Default;
+				throw new Exception($"{GetType().Name}::GetValue missing frames"); 
 			
 			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
 			var LerpedValues = Prev.LerpTo(Next,Lerp);
 			if ( LerpedValues == null || LerpedValues.Length == 0 )
-				return Default;
+				throw new Exception($"Lerping frames resulting in missing data");
+
 			return LerpedValues;
 		}
 	}

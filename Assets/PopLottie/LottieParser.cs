@@ -102,32 +102,30 @@ namespace PopLottie
 		//	keyframes when NOT split vector
 		public Keyframed_FloatArray	k;
 		
-		public float			GetValue(FrameNumber Frame,float Default)
+		public float			GetValue(FrameNumber Frame)
 		{
-			var DefaultArray = new []{Default};
 			if ( SplitVector )
 			{
-				return x.GetValue(Frame,DefaultArray)[0];
+				return x.GetValueArray(Frame)[0];
 			}
 			return k.GetValue(Frame)[0];
 		}
 		
 		
-		public float[]			GetValue(FrameNumber Frame,float[] Default)
+		public float[]			GetValueArray(FrameNumber Frame)
 		{
 			if ( SplitVector )
 			{
-				var v0 = x.GetValue(Frame,Default)[0];
-				var v1 = y.GetValue(Frame,Default)[0];
+				var v0 = x.GetValueArray(Frame)[0];
+				var v1 = y.GetValueArray(Frame)[0];
 				return new []{v0,v1};
 			}
 			return k.GetValue(Frame);
 		}
 		
-		public Vector2			GetValue(FrameNumber Frame,Vector2 Default)
+		public Vector2			GetValueVec2(FrameNumber Frame)
 		{
-			var Default2 = new float[]{Default.x,Default.y};
-			var Values = GetValue(Frame,Default2);
+			var Values = GetValueArray(Frame);
 			if ( Values == null || Values.Length == 0 )
 				throw new Exception($"{GetType().Name}::GetValue(vec2) missing frames"); 
 
@@ -167,7 +165,7 @@ namespace PopLottie
 		public FrameNumber	Frame => t;
 		public bool			IsTerminatingFrame => s==null;
 		
-		public float		LerpTo(Frame_Float Next,float Lerp,float Default)
+		public float		LerpTo(Frame_Float Next,float Lerp)
 		{
 			float[] NextValues = Next.s;
 			float[] PrevValues = this.s;
@@ -381,13 +379,13 @@ namespace PopLottie
 			Frames.Add(Frame);
 		}
 		
-		public float GetValue(FrameNumber Frame,float Default)
+		public float GetValue(FrameNumber Frame)
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				throw new Exception($"{GetType().Name}::GetValue missing frames"); 
 				
 			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
-			return Prev.LerpTo( Next, Lerp, Default );
+			return Prev.LerpTo( Next, Lerp );
 		}
 	}
 	
@@ -440,9 +438,9 @@ namespace PopLottie
 		
 		public Keyframed_Float	k;	//	frames
 		
-		public float		GetValue(FrameNumber Frame,float Default)
+		public float		GetValue(FrameNumber Frame)
 		{
-			return k.GetValue(Frame,Default);
+			return k.GetValue(Frame);
 		}
 	}
 	
@@ -634,7 +632,7 @@ namespace PopLottie
 		
 		public float			GetWidth(FrameNumber Frame)
 		{
-			var Value = w.GetValue(Frame,Default:42);
+			var Value = w.GetValue(Frame);
 			//	gr: it kinda looks like unity's width is radius, and lotties is diameter, as it's consistently a bit thick
 			Value *= 0.8f;
 			return Value;
@@ -659,16 +657,16 @@ namespace PopLottie
 		
 		public Transformer	GetTransformer(FrameNumber Frame)
 		{
-			var Anchor = a.GetValue(Frame,Vector2.zero);
-			var Position = p.GetValue(Frame,Vector2.zero);
+			var Anchor = a.GetValueVec2(Frame);
+			var Position = p.GetValueVec2(Frame);
 			var FullScale = new Vector2(100,100);
-			var Scale = s.GetValue(Frame,Default:FullScale) /FullScale;
+			var Scale = s.GetValueVec2(Frame) /FullScale;
 			return new Transformer( Position, Anchor, Scale);
 		}
 		
 		public float GetAlpha(FrameNumber Frame)
 		{
-			var Opacity = o.GetValue(Frame,Default:100);
+			var Opacity = o.GetValue(Frame);
 			float Alpha = Opacity / 100.0f;
 			return Alpha;
 		}
@@ -714,7 +712,7 @@ namespace PopLottie
 			this.Parent = null;
 		}
 
-		Vector2	LocalToParent(Vector2 LocalPosition)
+		Vector2	LocalToParentPosition(Vector2 LocalPosition)
 		{
 			//	0,0 anchor and 0,0 translation is topleft
 			//	20,0 anchor and 0,0 position, makes 0,0 offscreen (-20,0) 
@@ -733,13 +731,13 @@ namespace PopLottie
 			return LocalSize;
 		}
 		
-		public Vector2	LocalToWorld(Vector2 LocalPosition)
+		public Vector2	LocalToWorldPosition(Vector2 LocalPosition)
 		{
-			var ParentPosition = LocalToParent(LocalPosition);
+			var ParentPosition = LocalToParentPosition(LocalPosition);
 			var WorldPosition = ParentPosition;
 			if ( Parent is Transformer parent )
 			{
-				WorldPosition = parent.LocalToWorld(ParentPosition);
+				WorldPosition = parent.LocalToWorldPosition(ParentPosition);
 			}
 			return WorldPosition;
 		}
@@ -970,10 +968,10 @@ namespace PopLottie
 			void DrawRect(Rect rect,Color colour,Transformer transform=null)
 			{
 				transform = transform ?? new Transformer();
-				var a = transform.LocalToWorld( new Vector2(rect.xMin,rect.yMin) );
-				var b = transform.LocalToWorld( new Vector2(rect.xMax,rect.yMin) );
-				var c = transform.LocalToWorld( new Vector2(rect.xMax,rect.yMax) );
-				var d = transform.LocalToWorld( new Vector2(rect.xMin,rect.yMax) );
+				var a = transform.LocalToWorldPosition( new Vector2(rect.xMin,rect.yMin) );
+				var b = transform.LocalToWorldPosition( new Vector2(rect.xMax,rect.yMin) );
+				var c = transform.LocalToWorldPosition( new Vector2(rect.xMax,rect.yMax) );
+				var d = transform.LocalToWorldPosition( new Vector2(rect.xMin,rect.yMax) );
 				Painter.BeginPath();
 				Painter.MoveTo( a );
 				Painter.LineTo( b );
@@ -1062,9 +1060,9 @@ namespace PopLottie
 							var cp0 = PrevPoint.Position + PrevPoint.OutTangent;
 							var cp1 = Point.Position + Point.InTangent;
 							
-							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
-							var ControlPoint0 = GroupTransform.LocalToWorld(cp0);
-							var ControlPoint1 = GroupTransform.LocalToWorld(cp1);
+							var VertexPosition = GroupTransform.LocalToWorldPosition(Point.Position);
+							var ControlPoint0 = GroupTransform.LocalToWorldPosition(cp0);
+							var ControlPoint1 = GroupTransform.LocalToWorldPosition(cp1);
 							
 							AddDebugPoint( Point.Position, 0, Color.red );
 							AddDebugPoint( Point.Position, 1, Color.green, cp0 );
@@ -1085,7 +1083,7 @@ namespace PopLottie
 							var PrevIndex = (p==0 ? Points.Length-1 : p-1);
 							var Point = Points[p];
 							var PrevPoint = Points[PrevIndex];
-							var VertexPosition = GroupTransform.LocalToWorld(Point.Position);
+							var VertexPosition = GroupTransform.LocalToWorldPosition(Point.Position);
 							//	skipping first one gives a more solid result, so wondering if
 							//	we need to be doing a mix of p and p+1...
 							if ( p==0 )
@@ -1101,9 +1099,10 @@ namespace PopLottie
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
-						var EllipseSize = GroupTransform.LocalToWorld( ellipse.Size.GetValue(Frame,Default:10) );
-						var LocalCenter = ellipse.Center.GetValue(Frame,Vector2.zero);
-						var EllipseCenter = GroupTransform.LocalToWorld(LocalCenter);
+						var EllipseSize2 = ellipse.Size.GetValueVec2(Frame);
+						var EllipseSize = GroupTransform.LocalToWorld(EllipseSize2.x);
+						var LocalCenter = ellipse.Center.GetValueVec2(Frame);
+						var EllipseCenter = GroupTransform.LocalToWorldPosition(LocalCenter);
 		
 						var Radius = EllipseSize;
 						Painter.Arc( EllipseCenter, Radius, 0, 360 );
@@ -1162,8 +1161,8 @@ namespace PopLottie
 				{
 					foreach ( var Point in DebugPoints )
 					{
-						var WorldStart = GroupTransform.LocalToWorld(Point.Start);
-						Vector2? WorldEnd = Point.End.HasValue ? GroupTransform.LocalToWorld(Point.End.Value) : null;
+						var WorldStart = GroupTransform.LocalToWorldPosition(Point.Start);
+						Vector2? WorldEnd = Point.End.HasValue ? GroupTransform.LocalToWorldPosition(Point.End.Value) : null;
 						
 						Painter.lineWidth = 0.2f;
 						Painter.strokeColor = Point.Colour;

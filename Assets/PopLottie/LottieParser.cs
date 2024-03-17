@@ -765,7 +765,8 @@ namespace PopLottie
 	[Serializable] public class ShapeGroup: Shape 
 	{
 		public List<ShapeWrapper>		it;	//	children
-		public IEnumerable<Shape>		Children => it.Select( sw => sw.TheShape );
+		public IEnumerable<Shape>		ChildrenFrontToBack => it.Select( sw => sw.TheShape );
+		public IEnumerable<Shape>		ChildrenBackToFront => ChildrenFrontToBack.Reverse();
 		
 		Shape				GetChild(ShapeType MatchType)
 		{
@@ -857,7 +858,8 @@ namespace PopLottie
 		public int					ao;
 		public bool					AutoOrient => ao != 0;
 		public ShapeWrapper[]		shapes;
-		public IEnumerable<Shape>	Children => shapes.Select( sw => sw.TheShape );
+		public IEnumerable<Shape>	ChildrenFrontToBack => shapes.Select( sw => sw.TheShape );
+		public IEnumerable<Shape>	ChildrenBackToFront => ChildrenFrontToBack.Reverse();
 		public int					bm;
 		public int					BlendMode => bm;
 	}
@@ -912,6 +914,8 @@ namespace PopLottie
 			
 		public AssetMeta[]	assets;
 		public LayerMeta[]	layers;
+		public LayerMeta[]	LayersFrontToBack => layers;
+		public LayerMeta[]	LayersBackToFront => LayersFrontToBack.Reverse().ToArray();
 		public MarkerMeta[]	markers;
 
 		public AssetMeta[]	Assets => assets ?? Array.Empty<AssetMeta>();
@@ -1010,7 +1014,7 @@ namespace PopLottie
 			void RenderGroup(ShapeGroup Group,Transformer ParentTransform,float LayerAlpha)
 			{
 				//	run through sub shapes
-				var Children = Group.Children;
+				var Children = Group.ChildrenBackToFront;
 
 				//	elements (shapes) in the layer may be in the wrong order, so need to pre-extract style & transform
 				var GroupTransform = Group.GetTransformer(Frame);
@@ -1191,7 +1195,7 @@ namespace PopLottie
 			}
 		
 			//	layers go front to back
-			foreach ( var Layer in lottie.layers.Reverse() )
+			foreach ( var Layer in lottie.LayersBackToFront )
 			{
 				if ( !Layer.IsVisible(Frame) )
 					continue;
@@ -1230,7 +1234,7 @@ namespace PopLottie
 				}
 
 				//	render the shape
-				foreach ( var Shape in Layer.Children )
+				foreach ( var Shape in Layer.ChildrenBackToFront )
 				{
 					try
 					{

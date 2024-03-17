@@ -522,9 +522,6 @@ namespace PopLottie
 		TrimPath,		//	path trimmer, to modify (trim) a sibling shape
 	}
 	
-	public class ShapeSpecificMeta
-	{
-	}
 
 	public class ShapeConvertor : JsonConverter<ShapeWrapper>
 	{

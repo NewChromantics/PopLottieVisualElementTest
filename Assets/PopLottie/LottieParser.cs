@@ -225,42 +225,6 @@ namespace PopLottie
 	}
 	
 	
-	class Keyframed_Vector2Convertor : JsonConverter<Keyframed_Vector2>
-	{
-		public override void WriteJson(JsonWriter writer, Keyframed_Vector2 value, JsonSerializer serializer)
-		{
-			throw new NotImplementedException();
-		}
-
-		public override Keyframed_Vector2 ReadJson(JsonReader reader, Type objectType, Keyframed_Vector2 existingValue, bool hasExistingValue,JsonSerializer serializer)
-		{
-			if ( reader.TokenType == JsonToken.StartObject )
-			{
-				var ThisObject = JObject.Load(reader);
-				var SingleFrame = ThisObject.ToObject<Frame_Vector2>(serializer);
-				existingValue.AddFrame(SingleFrame);
-			}
-			else if ( reader.TokenType == JsonToken.StartArray )
-			{
-				var ThisArray = JArray.Load(reader);
-				foreach ( var Frame in ThisArray )
-				{
-					var FrameReader = new JTokenReader(Frame);
-					var FrameObject = JObject.Load(FrameReader);
-					var SingleFrame = FrameObject.ToObject<Frame_Vector2>(serializer);
-					existingValue.AddFrame(SingleFrame);
-				}
-			}
-			else 
-			{
-				//existingValue.ReadAnimatedOrNotAnimated(reader);
-				Debug.LogWarning($"Decoding Keyframed_Vector2 unhandled token type {reader.TokenType}");
-			}
-			return existingValue;
-		}
-	}
-	
-	
 	
 	class KeyframedConvertor<KeyFramedType,FrameType> : JsonConverter<KeyFramedType> where KeyFramedType : IKeyframed<FrameType>
 	{
@@ -337,41 +301,6 @@ namespace PopLottie
 		public void AddFrame(float[] Values);
 	}
 	
-	//	make this generic
-	[JsonConverter(typeof(Keyframed_Vector2Convertor))]
-	public struct Keyframed_Vector2 : IKeyframed<Frame_Vector2>
-	{
-		//public int					a;
-		//public int					ix;
-		
-		List<Frame_Vector2>		Frames;
-		
-		public void AddFrame(float[] Numbers)
-		{
-			throw new Exception($"todo: vector2 from {Numbers}");
-		}
-
-		public void AddFrame(JObject Object,JsonSerializer Serializer)
-		{
-			AddFrame( Object.ToObject<Frame_Vector2>(Serializer) );
-		}
-		
-		public void AddFrame(Frame_Vector2 Frame)
-		{
-			Frames = Frames ?? new();
-			Frames.Add(Frame);
-		}
-
-		public Vector2 GetValue(TimeSpan Time)
-		{
-			if ( Frames == null || Frames.Count == 0 )
-				return new Vector2(1,1);
-			var xy = Frames[0].i;
-			return new Vector2(xy.x[0],xy.y[0]);
-		}
-
-	}
-
 	public interface IFrame
 	{
 		public FrameNumber		Frame { get;}

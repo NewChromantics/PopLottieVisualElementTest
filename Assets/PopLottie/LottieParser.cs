@@ -88,20 +88,39 @@ namespace PopLottie
 	}
 	
 	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/
-	[Serializable] public struct AnimatedVector
+	[Serializable] public class AnimatedVector
 	{
 		public int				a;
 		public bool				Animated => a!=0;
+		public bool				s;
 		
-		public Keyframed_FloatArray	k;	//	frames
+		//	the vector .p(this) is split into components instead of arrays of values
+		public bool				SplitVector => s;	
+		public AnimatedVector	x;
+		public AnimatedVector	y;
+		
+		//	keyframes when NOT split vector
+		public Keyframed_FloatArray	k;
 		
 		public float			GetValue(FrameNumber Frame,float Default)
 		{
-			return k.GetValue(Frame,new float[]{Default})[0];
+			var DefaultArray = new []{Default};
+			if ( SplitVector )
+			{
+				return x.GetValue(Frame,DefaultArray)[0];
+			}
+			return k.GetValue(Frame,DefaultArray)[0];
 		}
+		
 		
 		public float[]			GetValue(FrameNumber Frame,float[] Default)
 		{
+			if ( SplitVector )
+			{
+				var v0 = x.GetValue(Frame,Default)[0];
+				var v1 = y.GetValue(Frame,Default)[0];
+				return new []{v0,v1};
+			}
 			return k.GetValue(Frame,Default);
 		}
 		

@@ -652,7 +652,7 @@ namespace PopLottie
 		
 		//	gr: not parsing as mix of animated & not
 		public AnimatedVector	s;	//	scale
-		//public AnimatedVector	r;	//	rotation
+		public AnimatedVector	r;	//	rotation
 		public AnimatedNumber	o;	//	opacity
 		
 		public Transformer	GetTransformer(FrameNumber Frame)
@@ -661,7 +661,8 @@ namespace PopLottie
 			var Position = p.GetValueVec2(Frame);
 			var FullScale = new Vector2(100,100);
 			var Scale = s.GetValueVec2(Frame) /FullScale;
-			return new Transformer( Position, Anchor, Scale);
+			var Rotation = r.GetValue(Frame);
+			return new Transformer( Position, Anchor, Scale, Rotation );
 		}
 		
 		public float GetAlpha(FrameNumber Frame)
@@ -699,17 +700,19 @@ namespace PopLottie
 		Vector2				Scale = Vector2.one;
 		Vector2				Translation;
 		Vector2				Anchor;
+		float				RotationDegrees;
 		
 		public Transformer()
 		{
 		}
 		
-		public Transformer(Vector2 Translation,Vector2 Anchor,Vector2 Scale)
+		public Transformer(Vector2 Translation,Vector2 Anchor,Vector2 Scale,float RotationDegrees)
 		{
 			this.Translation = Translation;
 			this.Anchor = Anchor;
 			this.Scale = Scale;
 			this.Parent = null;
+			this.RotationDegrees = RotationDegrees;
 		}
 
 		Vector2	LocalToParentPosition(Vector2 LocalPosition)
@@ -719,6 +722,7 @@ namespace PopLottie
 			//	anchor 20, pos 100, makes 0,0 at 80,0
 			//	scale applies after offset
 			LocalPosition -= Anchor;
+			LocalPosition = Quaternion.AngleAxis(RotationDegrees, Vector3.forward) * LocalPosition;
 			//	apply rotation here
 			LocalPosition *= Scale;
 			LocalPosition += Translation;
@@ -1004,7 +1008,7 @@ namespace PopLottie
 			
 			//	gr: work this out properly....
 			//		
-			Transformer RootTransformer = new Transformer( ContentRect.min, Vector2.zero, ScaleToCanvas );
+			Transformer RootTransformer = new Transformer( ContentRect.min, Vector2.zero, ScaleToCanvas, 0f );
 			//Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, Vector2.one);
 			if ( EnableDebug )
 				DrawRect(LottieCanvasRect, new Color(0,1,1,0.1f), RootTransformer );

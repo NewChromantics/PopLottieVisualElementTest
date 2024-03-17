@@ -268,17 +268,83 @@ namespace PopLottie
 			return p;
 		}
 
+
+		static float GetSlope(float aT,float aA1,float aA2)
+		{
+			static float A(float aA1, float aA2) { return 1.0f - 3.0f * aA2 + 3.0f * aA1; }
+			static float B(float aA1, float aA2) { return 3.0f * aA2 - 6.0f * aA1; }
+			static float C(float aA1) { return 3.0f * aA1; }
+
+			return 3.0f * A(aA1, aA2) * aT * aT + 2.0f * B(aA1, aA2) * aT + C(aA1);
+		}
+
+		static float GetBezierValue(float p0,float p1,float p2,float p3,float Time)
+		{
+			float t = Time;
+			
+			//	https://morethandev.hashnode.dev/demystifying-the-cubic-bezier-function-ft-javascript
+			return (1 - t) * (1 - t) * (1 - t) * p0
+					+
+					3 * (1 - t) * (1 - t) * t * p1
+					+
+					3 * (1 - t) * t * t * p2
+					+
+					t * t * t * p3;
+			
+			//	https://github.com/NewChromantics/PopToaster/blob/f30bc186a9df993a4c856ee71b79ef88081203a5/PopEngine/Math.js#L1420
+			var OneMinusTcu = (1-t) * (1-t) * (1-t);
+			var OneMinusTsq = (1-t) * (1-t);
+			var Tsq = t*t;
+			var Tcu = t*t*t;
+			//	https://javascript.info/bezier-curve
+			var p = OneMinusTcu*p0 + 3*OneMinusTsq*t*p1 +3*(1-t)*Tsq*p2 + Tcu*p3;
+			return p;
+		}
+
+
 		static float Interpolate(float Prev,float Next,float Time,float? InX,float? InY,float? OutX,float? OutY)
 		{
+			//	from docs
+			//	The y axis represents the value interpolation factor, a value of 0 represents the value at the current keyframe, a value of 1 represents the value at the next keyframe
 			var LinearValue = Mathf.Lerp( Prev, Next, Time );
+			
+			
+			float GetCurveX(float Start,float EaseOut,float EaseIn,float End,float Time)
+			{
+				//return GetBezierValue( Start, EaseOut, EaseIn, End, Time );
+				//	https://github.com/Samsung/rlottie/blob/d40008707addacb636ff435236d31c694ce2b6cf/src/vector/vinterpolator.cpp#L86
+				//	newton raphson iterating to find tighter point on the curve
+				var aX = Time;
+				var aGuessT = Time;
+				for ( int it=0;	it<10;	it++ )
+				{
+					float CurrentX = GetBezierValue( Start, EaseOut, EaseIn, End, aGuessT ) - aX;
+					float Slope = GetSlope( aGuessT, EaseOut, EaseIn );
+					if ( Slope <= 0.0001f )
+						break;
+						
+					aGuessT -= CurrentX / Slope;
+				}
+				return aGuessT;
+			}
+			
+			
 			if ( InX != null )
 			{
-				var EaseIn = new Vector2( InX.Value, InY.Value );
+				var Start = Vector2.zero;
 				var EaseOut = new Vector2( OutX.Value, OutY.Value );
-				var CurvedTime2 = GetBezierValue( Vector2.zero, EaseIn, EaseOut, Vector2.one, Time );
-				var CurvedTime = CurvedTime2.x;
-				var Value = Mathf.Lerp( Prev, Next, CurvedTime );
-				return Value;
+				var EaseIn = new Vector2( InX.Value, InY.Value );
+				var End = Vector2.one;
+
+				//	https://github.com/airbnb/lottie-ios/blob/41dfe7b0d8c3349adc7a5a03a1c6aaac8746433d/Sources/Private/Utility/Primitives/UnitBezier.swift#L36
+				//	uses https://github.com/gnustep/libs-quartzcore/blob/master/Source/CAMediaTimingFunction.m#L204C13-L204C25
+				//	solve time first
+				float CurveTime = GetCurveX( Start.x, EaseOut.x, EaseIn.x, End.x, Time );
+				
+				//	solve value
+				float CurveValue = GetBezierValue( Start.y, EaseOut.y, EaseIn.y, End.y, CurveTime );
+				var FinalValue = Mathf.Lerp( Prev, Next, CurveValue );
+				return FinalValue;
 			}
 			return LinearValue;
 		}

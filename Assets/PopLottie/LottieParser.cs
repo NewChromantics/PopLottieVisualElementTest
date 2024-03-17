@@ -737,6 +737,12 @@ namespace PopLottie
 			return LocalPosition;
 		}
 		
+		float	LocalToParent(float LocalSize)
+		{
+			LocalSize *= Scale.x;
+			return LocalSize;
+		}
+		
 		public Vector2	LocalToWorld(Vector2 LocalPosition)
 		{
 			var ParentPosition = LocalToParent(LocalPosition);
@@ -750,8 +756,13 @@ namespace PopLottie
 		
 		public float	LocalToWorld(float LocalSize)
 		{
-			LocalSize *= Scale.x;
-			return LocalSize;
+			var ParentSize = LocalToParent(LocalSize);
+			var WorldSize = ParentSize;
+			if ( Parent is Transformer parent )
+			{
+				WorldSize = parent.LocalToWorld(ParentSize);
+			}
+			return WorldSize;
 		}
 		
 	}

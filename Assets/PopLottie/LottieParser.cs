@@ -891,6 +891,7 @@ namespace PopLottie
 	{
 		public TimeSpan	FrameToTime(FrameNumber Frame)
 		{
+			//Frame -= FirstKeyFrame;
 			return TimeSpan.FromSeconds(Frame/ FramesPerSecond);
 		}
 		//	gr: output is really float, but trying int for simplicity for a moment...
@@ -899,7 +900,7 @@ namespace PopLottie
 			var Duration = this.Duration.TotalSeconds;
 			var TimeSecs = Looped ? TimeSpan.FromSeconds(Time.TotalSeconds % Duration) : TimeSpan.FromSeconds(Mathf.Min((float)Time.TotalSeconds,(float)Duration));
 			var Frame = (TimeSecs.TotalSeconds * FramesPerSecond);
-			Frame += FirstKeyFrame;
+			//Frame += FirstKeyFrame;
 			return (FrameNumber)Frame;
 		}
 		

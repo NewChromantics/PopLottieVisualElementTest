@@ -725,9 +725,9 @@ namespace PopLottie
 			return LocalPosition;
 		}
 		
-		float	LocalToParent(float LocalSize)
+		Vector2	LocalToParentSize(Vector2 LocalSize)
 		{
-			LocalSize *= Scale.x;
+			LocalSize *= Scale;
 			return LocalSize;
 		}
 		
@@ -742,15 +742,22 @@ namespace PopLottie
 			return WorldPosition;
 		}
 		
-		public float	LocalToWorld(float LocalSize)
+		public Vector2	LocalToWorldSize(Vector2 LocalSize)
 		{
-			var ParentSize = LocalToParent(LocalSize);
+			var ParentSize = LocalToParentSize(LocalSize);
 			var WorldSize = ParentSize;
 			if ( Parent is Transformer parent )
 			{
-				WorldSize = parent.LocalToWorld(ParentSize);
+				WorldSize = parent.LocalToWorldSize(ParentSize);
 			}
 			return WorldSize;
+		}
+		public float	LocalToWorldSize(float LocalSize)
+		{
+			//	expected to be used in 1D cases anyway
+			var Size2 = new Vector2(LocalSize,LocalSize);
+			Size2 = LocalToWorldSize(Size2);
+			return Size2.x;
 		}
 		
 	}
@@ -1035,7 +1042,7 @@ namespace PopLottie
 					StrokeColour.a *= GroupAlpha;
 					Painter.fillColor = FillColour;
 					Painter.strokeColor = StrokeColour;
-					Painter.lineWidth = GroupTransform.LocalToWorld( GroupStyle.StrokeWidth ?? 1 );
+					Painter.lineWidth = GroupTransform.LocalToWorldSize( GroupStyle.StrokeWidth ?? 1 );
 					if ( GroupStyle.IsStroked )
 						Painter.Stroke();
 					if ( GroupStyle.IsFilled )
@@ -1099,12 +1106,12 @@ namespace PopLottie
 					}
 					if ( Child is ShapeEllipse ellipse )
 					{
-						var EllipseSize2 = ellipse.Size.GetValueVec2(Frame);
-						var EllipseSize = GroupTransform.LocalToWorld(EllipseSize2.x);
+						var EllipseSize = GroupTransform.LocalToWorldSize(ellipse.Size.GetValueVec2(Frame));
 						var LocalCenter = ellipse.Center.GetValueVec2(Frame);
 						var EllipseCenter = GroupTransform.LocalToWorldPosition(LocalCenter);
-		
-						var Radius = EllipseSize;
+						
+						//	todo: turn into a path as painter can't do non uniform ellipses!
+						var Radius = EllipseSize.x;
 						Painter.Arc( EllipseCenter, Radius, 0, 360 );
 						AddDebugPoint( LocalCenter, 0, Color.magenta );
 					}

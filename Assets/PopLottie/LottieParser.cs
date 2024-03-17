@@ -305,9 +305,13 @@ namespace PopLottie
 				if ( ThisFrame.Frame > TargetFrame )
 					break;
 				//	terminating frames have no values
+				//	gr: seem to have some in the middle... need to work out handling those...
 				if ( ThisFrame.IsTerminatingFrame )
+				{
+					if ( f != Frames.Count-1 )
+						Debug.LogWarning($"Terminator frame in middle of sequence {f}/{Frames.Count-1}");
 					break;
-				//if ( ThisFrame.Frame >= TargetFrame ) break;
+				}
 				PrevIndex = f;
 			}
 			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);

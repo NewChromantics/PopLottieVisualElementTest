@@ -27,7 +27,7 @@ namespace PopLottie
 	
 
 	[Serializable]
-	public struct ValueCurveData
+	public struct ValueCurve
 	{
 		public float[]	x;	//	time X axis
 		public float[]	y;	//	value Y axis
@@ -87,8 +87,8 @@ namespace PopLottie
 
 	[Serializable] public struct Frame_Float : IFrame
 	{
-		public ValueCurveData	i;	//	ease in value
-		public ValueCurveData	o;	//	ease out value
+		public ValueCurve	i;	//	ease in value
+		public ValueCurve	o;	//	ease out value
 		public float		t;	//	time
 		public float[]		s;	//	value at time
 		public float[]		e;	//	end value
@@ -126,8 +126,8 @@ namespace PopLottie
 	
 	[Serializable] public struct Frame_FloatArray : IFrame
 	{
-		public ValueCurveData	i;
-		public ValueCurveData	o;
+		public ValueCurve	i;
+		public ValueCurve	o;
 		public int			h;
 		public bool			HoldingFrame => h!=0;
 		public float		t;	//	time
@@ -273,7 +273,7 @@ namespace PopLottie
 			return LinearValue;
 		}
 		
-		static float Interpolate(int Component,float[] Prev,float[] Next,float Time,ValueCurveData? In,ValueCurveData? Out)
+		static float Interpolate(int Component,float[] Prev,float[] Next,float Time,ValueCurve? In,ValueCurve? Out)
 		{
 			if ( Component < 0 || Component >= Prev.Length )
 				throw new Exception($"Interpolate out of bounds");

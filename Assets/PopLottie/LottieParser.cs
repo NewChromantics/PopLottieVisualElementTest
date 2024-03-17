@@ -25,37 +25,6 @@ namespace PopLottie
 	{
 	}
 	
-	
-	//	sometimes this is an AnimCurve (x/y graph)
-	//	somtimes it's just a number? or an array of numbers 
-	class ValueCurveConvertor : JsonConverter<ValueCurve>
-	{
-		public override void WriteJson(JsonWriter writer, ValueCurve value, JsonSerializer serializer) { throw new NotImplementedException(); }
-		public override ValueCurve ReadJson(JsonReader reader, Type objectType, ValueCurve existingValue, bool hasExistingValue,JsonSerializer serializer)
-		{
-			if ( reader.TokenType == JsonToken.StartObject )
-			{
-				var ThisObject = JObject.Load(reader);
-				var SingleFrame = ThisObject.ToObject<ValueCurveData>(serializer);
-				existingValue.data = SingleFrame;
-			}
-			else if ( reader.TokenType == JsonToken.StartArray )
-			{
-				var ThisArray = JArray.Load(reader);
-				foreach ( var Frame in ThisArray )
-				{
-					throw new Exception("todo handle an array of values");
-				}
-			}
-			else 
-			{
-				//existingValue.ReadAnimatedOrNotAnimated(reader);
-				Debug.LogWarning($"Decoding ValueCurveConvertor unhandled token type {reader.TokenType}");
-			}
-			return existingValue;
-		}
-	}
-	
 
 	[Serializable]
 	public struct ValueCurveData
@@ -63,22 +32,7 @@ namespace PopLottie
 		public float[]	x;	//	time X axis
 		public float[]	y;	//	value Y axis
 	}
-	
-	[JsonConverter(typeof(ValueCurveConvertor))]
-	[Serializable]
-	public struct ValueCurve
-	{
-		public ValueCurveData	data;
-		public float[]	x => data.x;
-		public float[]	y => data.y;
-		
-		public float	GetValue(TimeSpan NormalisedTime)
-		{
-			return y[0];
-		}
-	}
-	
-	
+
 	//	https://lottiefiles.github.io/lottie-docs/playground/json_editor/
 	[Serializable] public class AnimatedVector
 	{
@@ -129,38 +83,25 @@ namespace PopLottie
 		}
 	}
 
-	
-	[Serializable] public struct Keyframe2
-	{
-		public Vector2		i;
-		public Vector2		o;
-		public float		t;	//	time
-		public float[]		s;	//	start value
-		public float[]		e;	//	end value
-	}
-	
-	[Serializable] public struct Float2
-	{
-		public float[]		x;
-		public float[]		y;
-	}
 
-	
-	
+
 	[Serializable] public struct Frame_Float : IFrame
 	{
-		public ValueCurve	i;	//	ease in value
-		public ValueCurve	o;	//	ease out value
+		public ValueCurveData	i;	//	ease in value
+		public ValueCurveData	o;	//	ease out value
 		public float		t;	//	time
 		public float[]		s;	//	value at time
 		public float[]		e;	//	end value
 		public FrameNumber	Frame => t;
 		public bool			IsTerminatingFrame => s==null;
 		
-		public float		LerpTo(Frame_Float Next,float Lerp)
+		public float		LerpTo(Frame_Float Next,float? Lerp)
 		{
 			float[] NextValues = Next.s;
 			float[] PrevValues = this.s;
+
+			if ( Lerp == null )
+				return PrevValues[0];
 
 			//	this happens on terminator frames
 			if ( NextValues == null )
@@ -175,16 +116,18 @@ namespace PopLottie
 
 			//	lerp each member
 			var Values = new float[s.Length];
-			for ( int i=0;	i<Values.Length;	i++ )
-				Values[i] = Mathf.Lerp( PrevValues[i], NextValues[i], Lerp );
+			for ( int v=0;	v<Values.Length;	v++ )
+				Values[v] = IFrame.Interpolate( v, PrevValues, NextValues, Lerp.Value, i, o );
 			return Values[0];
 		}
 		
 	}
+	
+	
 	[Serializable] public struct Frame_FloatArray : IFrame
 	{
-		public ValueCurve	i;
-		public ValueCurve	o;
+		public ValueCurveData	i;
+		public ValueCurveData	o;
 		public int			h;
 		public bool			HoldingFrame => h!=0;
 		public float		t;	//	time
@@ -193,10 +136,12 @@ namespace PopLottie
 		public FrameNumber	Frame	=> t;
 		public bool			IsTerminatingFrame => s==null;
 			
-		public float[]		LerpTo(Frame_FloatArray Next,float Lerp)
+		public float[]		LerpTo(Frame_FloatArray Next,float? Lerp)
 		{
 			float[] NextValues = Next.s;
 			float[] PrevValues = this.s;
+			if ( Lerp == null )
+				return PrevValues;
 
 			//	this happens on terminator frames
 			if ( NextValues == null )
@@ -211,8 +156,8 @@ namespace PopLottie
 		
 			//	lerp each member
 			var Values = new float[s.Length];
-			for ( int i=0;	i<Values.Length;	i++ )
-				Values[i] = Mathf.Lerp( PrevValues[i], NextValues[i], Lerp );
+			for ( int v=0;	v<Values.Length;	v++ )
+				Values[v] = IFrame.Interpolate( v, PrevValues, NextValues, Lerp.Value, i, o );
 			return Values;
 		}
 	}
@@ -299,7 +244,45 @@ namespace PopLottie
 		public FrameNumber		Frame { get;}
 		public bool				IsTerminatingFrame {get;}	//	if this frame is just an end frame with no values, we wont try and read them
 		
-		static (FRAMETYPE,float,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,FrameNumber TargetFrame) where FRAMETYPE : IFrame
+		//	https://github.com/NewChromantics/PopToaster/blob/f30bc186a9df993a4c856ee71b79ef88081203a5/PopEngine/Math.js#L1420
+		//	p0 = start, p1 = control/easing in, p2 = control/easing out, p3 = end
+		static Vector2 GetBezierValue(Vector2 p0,Vector2 p1,Vector2 p2,Vector2 p3,float Time)
+		{
+			float t = Time;
+			var OneMinusTcu = (1-t) * (1-t) * (1-t);
+			var OneMinusTsq = (1-t) * (1-t);
+			var Tsq = t*t;
+			var Tcu = t*t*t;
+			//	https://javascript.info/bezier-curve
+			var p = OneMinusTcu*p0 + 3*OneMinusTsq*t*p1 +3*(1-t)*Tsq*p2 + Tcu*p3;
+			return p;
+		}
+
+		static float Interpolate(float Prev,float Next,float Time,float? InX,float? InY,float? OutX,float? OutY)
+		{
+			var LinearValue = Mathf.Lerp( Prev, Next, Time );
+			if ( InX != null )
+			{
+				var EaseIn = new Vector2( InX.Value, InY.Value );
+				var EaseOut = new Vector2( OutX.Value, OutY.Value );
+				var CurvedTime2 = GetBezierValue( Vector2.zero, EaseIn, EaseOut, Vector2.one, Time );
+				var CurvedTime = CurvedTime2.x;
+				var Value = Mathf.Lerp( Prev, Next, CurvedTime );
+				return Value;
+			}
+			return LinearValue;
+		}
+		
+		static float Interpolate(int Component,float[] Prev,float[] Next,float Time,ValueCurveData? In,ValueCurveData? Out)
+		{
+			if ( Component < 0 || Component >= Prev.Length )
+				throw new Exception($"Interpolate out of bounds");
+			return Interpolate( Prev[Component], Next[Component], Time, In?.x?[Component], In?.y?[Component], Out?.x?[Component], Out?.y?[Component] );
+		}
+	
+		
+		//	returns null for Time, if both are same frame
+		static (FRAMETYPE,float?,FRAMETYPE) GetPrevNextFramesAtFrame<FRAMETYPE>(List<FRAMETYPE> Frames,FrameNumber TargetFrame) where FRAMETYPE : IFrame
 		{
 			if ( Frames == null || Frames.Count == 0 )
 				throw new Exception("GetPrevNextFramesAtFrame missing frames");
@@ -327,6 +310,11 @@ namespace PopLottie
 			var NextIndex = Mathf.Min(PrevIndex + 1, Frames.Count-1);
 			var Prev = Frames[PrevIndex];
 			var Next = Frames[NextIndex];
+
+			//	allow some optimisations by inferring that there is nothing to lerp between
+			if ( PrevIndex == NextIndex )
+				return (Prev,null,Prev);
+
 			//	get the lerp(time) between prev & next
 			float Range(float Min,float Max,float Value)
 			{
@@ -340,6 +328,7 @@ namespace PopLottie
 				Lerp = 0;
 			if ( Lerp > 1 )
 				Lerp = 1;
+				
 			return (Prev,Lerp,Next);
 		}
 		
@@ -377,7 +366,7 @@ namespace PopLottie
 				throw new Exception($"{GetType().Name}::GetValue missing frames"); 
 				
 			var (Prev,Lerp,Next) = IFrame.GetPrevNextFramesAtFrame(Frames,Frame);
-			return Prev.LerpTo( Next, Lerp );
+			return Prev.LerpTo( Next, Lerp.Value );
 		}
 	}
 	
@@ -999,7 +988,6 @@ namespace PopLottie
 			var ScaleToCanvas = Stretch ? new Vector2( ScaleToCanvasWidth, ScaleToCanvasHeight ) : new Vector2( ScaleToCanvasUniform, ScaleToCanvasUniform );
 			
 			//	gr: work this out properly....
-			//		
 			Transformer RootTransformer = new Transformer( ContentRect.min, Vector2.zero, ScaleToCanvas, 0f );
 			//Transformer RootTransformer = new Transformer( Vector2.zero, Vector2.zero, Vector2.one);
 			if ( EnableDebug )

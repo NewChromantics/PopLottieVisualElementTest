@@ -35,6 +35,21 @@ namespace PopLottie
 				MarkDirtyRepaint();
 			}
 		}
+		
+		TimeSpan?	RedrawInterval;
+		public uint	redrawIntervalMilliseconds
+		{
+			get => (uint)(RedrawInterval?.TotalMilliseconds ?? 0);
+			set
+			{
+				if ( value <= 0 )
+					RedrawInterval = null;
+				else
+					RedrawInterval = TimeSpan.FromMilliseconds(value);
+				
+				SetAutoRedraw(RedrawInterval);
+			}
+		}
 
 
 
@@ -48,7 +63,7 @@ namespace PopLottie
 				
 				//	parse file
 				LottieAnimation = new Animation(_animationJson.text);
-				SetAutoRedraw( TimeSpan.FromMilliseconds(10) );
+				SetAutoRedraw( RedrawInterval );
 			}
 			catch ( Exception e)
 			{
@@ -61,15 +76,20 @@ namespace PopLottie
 		public new class UxmlFactory : UxmlFactory<LottieVisualElement, UxmlTraits> { }
 		public new class UxmlTraits : VisualElement.UxmlTraits
 		{
-			UxmlBoolAttributeDescription enableDebugAttribute = new UxmlBoolAttributeDescription()
+			UxmlBoolAttributeDescription enableDebugAttribute = new()
 			{
-				name = "enableDebug",
+				name = "enable-Debug",
 				defaultValue = false
 			};
-			UxmlStringAttributeDescription resourceFilenameAttribute = new UxmlStringAttributeDescription()
+			UxmlStringAttributeDescription resourceFilenameAttribute = new()
 			{
-				name = "resourceFilename",
+				name = "resource-Filename",
 				defaultValue = "AnimationWithoutExtension"
+			};
+			UxmlUnsignedIntAttributeDescription redrawIntervalMillisecondsAttribute = new()
+			{
+				name = "redraw-Interval-Milliseconds",
+				defaultValue = 15
 			};
 
 			//public UxmlTraits() { }
@@ -81,6 +101,7 @@ namespace PopLottie
 				
 				(ve as LottieVisualElement).resourceFilename = resourceFilenameAttribute.GetValueFromBag(bag, cc);
 				(ve as LottieVisualElement).enableDebug = enableDebugAttribute.GetValueFromBag(bag, cc);
+				(ve as LottieVisualElement).redrawIntervalMilliseconds = redrawIntervalMillisecondsAttribute.GetValueFromBag(bag, cc);
 			}
 		}
 
@@ -109,8 +130,9 @@ namespace PopLottie
 			//	auto play by repainting this element
 			if ( RedrawInterval is TimeSpan interval )
 			{
-				var InervalMs = (long)interval.TotalMilliseconds;
-				autoRedrawScheduler = schedule.Execute( MarkDirtyRepaint ).Every(InervalMs);
+				var ItnervalMs = (long)interval.TotalMilliseconds;
+				Debug.Log($"Changing redraw interval to {ItnervalMs}ms");
+				autoRedrawScheduler = schedule.Execute( MarkDirtyRepaint ).Every(ItnervalMs);
 			}
 		}
 		

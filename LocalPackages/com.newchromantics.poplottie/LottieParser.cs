@@ -244,31 +244,6 @@ namespace PopLottie
 		public FrameNumber		Frame { get;}
 		public bool				IsTerminatingFrame {get;}	//	if this frame is just an end frame with no values, we wont try and read them
 		
-		//	p0 = start, p1 = control/easing in, p2 = control/easing out, p3 = end
-		static Vector2 GetBezierValue(Vector2 p0,Vector2 p1,Vector2 p2,Vector2 p3,float Time)
-		{
-			float t = Time;
-			
-			//	https://morethandev.hashnode.dev/demystifying-the-cubic-bezier-function-ft-javascript
-			return (1 - t) * (1 - t) * (1 - t) * p0
-					+
-					3 * (1 - t) * (1 - t) * t * p1
-					+
-					3 * (1 - t) * t * t * p2
-					+
-					t * t * t * p3;
-			
-			//	https://github.com/NewChromantics/PopToaster/blob/f30bc186a9df993a4c856ee71b79ef88081203a5/PopEngine/Math.js#L1420
-			var OneMinusTcu = (1-t) * (1-t) * (1-t);
-			var OneMinusTsq = (1-t) * (1-t);
-			var Tsq = t*t;
-			var Tcu = t*t*t;
-			//	https://javascript.info/bezier-curve
-			var p = OneMinusTcu*p0 + 3*OneMinusTsq*t*p1 +3*(1-t)*Tsq*p2 + Tcu*p3;
-			return p;
-		}
-
-
 		static float GetSlope(float aT,float aA1,float aA2)
 		{
 			static float A(float aA1, float aA2) { return 1.0f - 3.0f * aA2 + 3.0f * aA1; }
@@ -281,7 +256,6 @@ namespace PopLottie
 		static float GetBezierValue(float p0,float p1,float p2,float p3,float Time)
 		{
 			float t = Time;
-			
 			//	https://morethandev.hashnode.dev/demystifying-the-cubic-bezier-function-ft-javascript
 			return (1 - t) * (1 - t) * (1 - t) * p0
 					+
@@ -290,15 +264,6 @@ namespace PopLottie
 					3 * (1 - t) * t * t * p2
 					+
 					t * t * t * p3;
-			
-			//	https://github.com/NewChromantics/PopToaster/blob/f30bc186a9df993a4c856ee71b79ef88081203a5/PopEngine/Math.js#L1420
-			var OneMinusTcu = (1-t) * (1-t) * (1-t);
-			var OneMinusTsq = (1-t) * (1-t);
-			var Tsq = t*t;
-			var Tcu = t*t*t;
-			//	https://javascript.info/bezier-curve
-			var p = OneMinusTcu*p0 + 3*OneMinusTsq*t*p1 +3*(1-t)*Tsq*p2 + Tcu*p3;
-			return p;
 		}
 
 
@@ -1152,14 +1117,7 @@ namespace PopLottie
 							AddDebugPoint( Point.Position, 1, Color.green, cp0 );
 							AddDebugPoint( Point.Position, 2, Color.cyan, cp1 );
 
-							if ( true )
-							{
-								Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
-							}
-							else
-							{
-								Painter.LineTo( VertexPosition );
-							}
+							Painter.BezierCurveTo( ControlPoint0, ControlPoint1, VertexPosition  );
 						}
 						
 						for ( var p=0;	p<Points.Length;	p++ )

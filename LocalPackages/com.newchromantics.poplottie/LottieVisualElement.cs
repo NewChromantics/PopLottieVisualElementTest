@@ -148,7 +148,7 @@ namespace PopLottie
 			if ( RedrawInterval is TimeSpan interval )
 			{
 				var ItnervalMs = (long)interval.TotalMilliseconds;
-				Debug.Log($"Changing redraw interval to {ItnervalMs}ms");
+				//Debug.Log($"Changing redraw interval to {ItnervalMs}ms");
 				autoRedrawScheduler = schedule.Execute( MarkDirtyRepaint ).Every(ItnervalMs);
 			}
 		}

@@ -8,51 +8,52 @@ namespace PopLottie
 {
 	public class LottieVisualElement : VisualElement, IDisposable
 	{
-		// Image animation variables
-		string _loadingIconResourceUrl;
+		Animation	LottieAnimation;
+		
+		//	current auto-redraw scheduler causing element to re-draw
+		IVisualElementScheduledItem	autoRedrawScheduler;
 
-		PopLottie.Animation _lottieAnimation;
-		IVisualElementScheduledItem lastSchedule;
-		bool _animEnabled;
-		bool _enableDebug;
-
-		public bool enableDebug
+		string		ResourceFilename;
+		public string	resourceFilename
 		{
-			get => _enableDebug;
+			get => ResourceFilename;
 			set
 			{
-				_enableDebug = value;
-				MarkDirtyRepaint();
-			}
-		}
-
-		public string animatedImageResourceUrl
-		{
-			get => _loadingIconResourceUrl;
-			set
-			{
-				_loadingIconResourceUrl = value;
+				ResourceFilename = value;
 				LoadAnimation();
 				MarkDirtyRepaint();
 			}
 		}
+
+		bool		EnableDebug;
+		public bool	enableDebug
+		{
+			get => EnableDebug;
+			set
+			{
+				EnableDebug = value;
+				MarkDirtyRepaint();
+			}
+		}
+
 
 
 		void LoadAnimation()
 		{
 			try
 			{
-				var _animationJson = Resources.Load<TextAsset>(_loadingIconResourceUrl.ToString());
+				var _animationJson = Resources.Load<TextAsset>(ResourceFilename);
 				if ( _animationJson == null )
-					throw new Exception($"Text-Asset Resource not found at {_loadingIconResourceUrl}");
+					throw new Exception($"Text-Asset Resource not found at {ResourceFilename} (Do not include extension)");
 				
 				//	parse file
-				_lottieAnimation = new Animation(_animationJson.text);
+				LottieAnimation = new Animation(_animationJson.text);
+				SetAutoRedraw( TimeSpan.FromMilliseconds(10) );
 			}
 			catch ( Exception e)
 			{
 				Debug.LogException(e);
-				Debug.LogError($"Failed to load animation {_loadingIconResourceUrl}; {e.Message}");
+				Debug.LogError($"Failed to load animation {ResourceFilename}; {e.Message}");
 				Dispose();
 			}
 		}
@@ -65,10 +66,10 @@ namespace PopLottie
 				name = "enableDebug",
 				defaultValue = false
 			};
-			UxmlStringAttributeDescription animatedImageResourceUrlAttribute = new UxmlStringAttributeDescription()
+			UxmlStringAttributeDescription resourceFilenameAttribute = new UxmlStringAttributeDescription()
 			{
-				name = "animatedImageResourceUrl",
-				defaultValue = "ExampleNoExtension"
+				name = "resourceFilename",
+				defaultValue = "AnimationWithoutExtension"
 			};
 
 			//public UxmlTraits() { }
@@ -78,7 +79,7 @@ namespace PopLottie
 			{
 				base.Init(ve, bag, cc);
 				
-				(ve as LottieVisualElement).animatedImageResourceUrl = animatedImageResourceUrlAttribute.GetValueFromBag(bag, cc);
+				(ve as LottieVisualElement).resourceFilename = resourceFilenameAttribute.GetValueFromBag(bag, cc);
 				(ve as LottieVisualElement).enableDebug = enableDebugAttribute.GetValueFromBag(bag, cc);
 			}
 		}
@@ -91,9 +92,26 @@ namespace PopLottie
 
 			generateVisualContent += GenerateVisualContent;
 			
-			//	auto play by repainting this element (RIP child elements)
-			var FrameDeltaMs = 5;
-			this.schedule.Execute( MarkDirtyRepaint ).Every(FrameDeltaMs);
+			SetAutoRedraw( TimeSpan.FromMilliseconds(10) );
+		}
+		
+		//	pass null to stop auto animation
+		void SetAutoRedraw(TimeSpan? RedrawInterval)
+		{
+			//	stop old scheduler
+			if ( autoRedrawScheduler != null )
+			{
+				//	pause & null https://forum.unity.com/threads/understaning-schedule-ivisualelementscheduleditem.1125752/
+				autoRedrawScheduler.Pause();
+				autoRedrawScheduler = null;
+			}
+			
+			//	auto play by repainting this element
+			if ( RedrawInterval is TimeSpan interval )
+			{
+				var InervalMs = (long)interval.TotalMilliseconds;
+				autoRedrawScheduler = schedule.Execute( MarkDirtyRepaint ).Every(InervalMs);
+			}
 		}
 		
 		void OnAttached()
@@ -107,8 +125,9 @@ namespace PopLottie
 		
 		public void Dispose()
 		{
-			_lottieAnimation?.Dispose();
-			_lottieAnimation = null;
+			SetAutoRedraw(null);
+			LottieAnimation?.Dispose();
+			LottieAnimation = null;
 		}
 		
 		public TimeSpan GetTime()
@@ -117,46 +136,58 @@ namespace PopLottie
 		}
 		
 	
+		void DrawRectX(Painter2D painter2D,Rect rect,Color Colour,float LineWidth=1)
+		{
+			var TL = new Vector2( contentRect.xMin, contentRect.yMin );
+			var TR = new Vector2( contentRect.xMax, contentRect.yMin );
+			var BL = new Vector2( contentRect.xMin, contentRect.yMax );
+			var BR = new Vector2( contentRect.xMax, contentRect.yMax );
+			painter2D.BeginPath();
+			painter2D.MoveTo( TL );
+			painter2D.LineTo( TR );
+			painter2D.LineTo( BR );
+			painter2D.LineTo( BL );
+			painter2D.LineTo( TL );
+			painter2D.LineTo( BR );
+			painter2D.MoveTo( BL );
+			painter2D.LineTo( TR );
+			painter2D.ClosePath();
+			painter2D.lineWidth = LineWidth;
+			painter2D.strokeColor = Colour;
+			painter2D.Stroke();
+		}
+	
 		void GenerateVisualContent(MeshGenerationContext context)
 		{
 			//  draw an error box if we're missing the animation
 			//  gr: can we render text easily here?
-			if ( _lottieAnimation == null )
+			if ( LottieAnimation == null )
 			{
+				//	draw the content rect when animation missing
 				if ( enableDebug )
-				{
-					var TL = new Vector2( contentRect.xMin, contentRect.yMin );
-					var TR = new Vector2( contentRect.xMax, contentRect.yMin );
-					var BL = new Vector2( contentRect.xMin, contentRect.yMax );
-					var BR = new Vector2( contentRect.xMax, contentRect.yMax );
-					context.painter2D.BeginPath();
-					context.painter2D.MoveTo( TL );
-					context.painter2D.LineTo( TR );
-					context.painter2D.LineTo( BR );
-					context.painter2D.LineTo( BL );
-					context.painter2D.LineTo( TL );
-					context.painter2D.LineTo( BR );
-					context.painter2D.MoveTo( BL );
-					context.painter2D.LineTo( TR );
-					context.painter2D.ClosePath();
-					context.painter2D.lineWidth = 1;
-					context.painter2D.strokeColor = Color.magenta;
-					context.painter2D.Stroke();
-				}
+					DrawRectX( context.painter2D, contentRect, Color.red);
 				return;
 			}
 			
-			var Time = GetTime();
-			_lottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
-			//FrameNumber = (FrameNumber+1.001f) % (float)_lottieAnimation.FrameCount;
-			//_lottieAnimation.Render( FrameNumber, context.painter2D, contentRect, enableDebug );
+			//	render immediately
+			//	todo: turn this into something that gets commands
+			//		then only regenerate commands if the time has changed
+			try
+			{
+				var Time = GetTime();
+				LottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
+			}
+			catch(Exception e)
+			{
+				Debug.LogException(e);
+				DrawRectX( context.painter2D, contentRect, Color.magenta); 
+			}
 		}
-		float FrameNumber = 0;
 
 		void OnVisualElementDirty(GeometryChangedEvent ev)
 		{
 			//	content rect changed
-			Debug.Log($"OnVisualElementDirty anim={this._lottieAnimation} resource={this.animatedImageResourceUrl}");
+			//Debug.Log($"OnVisualElementDirty anim={this.LottieAnimation} resource={this.ResourceFilename}");
 		}
 
 

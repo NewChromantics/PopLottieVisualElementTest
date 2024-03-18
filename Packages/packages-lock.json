@@ -7,6 +7,12 @@
       "dependencies": {},
       "hash": "82e20a0008295f5fd1cc819c398a0e7a5bcfe731"
     },
+    "com.newchromantics.poplottie": {
+      "version": "file:../LocalPackages/com.newchromantics.poplottie",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {}
+    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 1,

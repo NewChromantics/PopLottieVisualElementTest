@@ -1002,7 +1002,7 @@ namespace PopLottie
 			
 			
 			lottie = (Root)serializer.Deserialize(new JTokenReader(Parsed), typeof(Root));
-			Debug.Log($"Decoded lottie ok x{lottie.layers.Length} layers");
+			//Debug.Log($"Decoded lottie ok x{lottie.layers.Length} layers");
 		}
 		
 		public TimeSpan Duration => lottie.Duration;

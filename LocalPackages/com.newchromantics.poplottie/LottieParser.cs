@@ -353,7 +353,15 @@ namespace PopLottie
 		{
 			if ( Component < 0 || Component >= Prev.Length )
 				throw new Exception($"Interpolate out of bounds");
-			return Interpolate( Prev[Component], Next[Component], Time, In?.x?[Component], In?.y?[Component], Out?.x?[Component], Out?.y?[Component] );
+			var EaseInX = In?.x;
+			//var EaseInY = In?.y;
+			//var EaseOutX = Out?.x;
+			//var EaseOutY = Out?.y;
+			//	somtimes the curve has fewer components than the object... should this be linear for that component, or spread?
+			var EaseComponent = Component;
+			if ( EaseInX != null )
+				EaseComponent = Mathf.Min( Component, EaseInX.Length-1 );
+			return Interpolate( Prev[Component], Next[Component], Time, In?.x?[EaseComponent], In?.y?[EaseComponent], Out?.x?[EaseComponent], Out?.y?[EaseComponent] );
 		}
 	
 		

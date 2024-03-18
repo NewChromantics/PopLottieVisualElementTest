@@ -36,6 +36,17 @@ namespace PopLottie
 			}
 		}
 		
+		ScaleMode			CanvasScaleMode;
+		public ScaleMode	scaleMode
+		{
+			get => CanvasScaleMode;
+			set
+			{
+				CanvasScaleMode = value;
+				MarkDirtyRepaint();
+			}
+		}
+		
 		TimeSpan?	RedrawInterval;
 		public uint	redrawIntervalMilliseconds
 		{
@@ -91,6 +102,11 @@ namespace PopLottie
 				name = "redraw-Interval-Milliseconds",
 				defaultValue = 15
 			};
+			UxmlEnumAttributeDescription<ScaleMode> scaleModeAttribute = new()
+			{
+				name = "scale-mode",
+				defaultValue = ScaleMode.ScaleToFit
+			};
 
 			//public UxmlTraits() { }
 
@@ -102,6 +118,7 @@ namespace PopLottie
 				(ve as LottieVisualElement).resourceFilename = resourceFilenameAttribute.GetValueFromBag(bag, cc);
 				(ve as LottieVisualElement).enableDebug = enableDebugAttribute.GetValueFromBag(bag, cc);
 				(ve as LottieVisualElement).redrawIntervalMilliseconds = redrawIntervalMillisecondsAttribute.GetValueFromBag(bag, cc);
+				(ve as LottieVisualElement).scaleMode = scaleModeAttribute.GetValueFromBag(bag, cc);
 			}
 		}
 
@@ -197,7 +214,7 @@ namespace PopLottie
 			try
 			{
 				var Time = GetTime();
-				LottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug );
+				LottieAnimation.Render( Time, context.painter2D, contentRect, enableDebug, CanvasScaleMode );
 			}
 			catch(Exception e)
 			{

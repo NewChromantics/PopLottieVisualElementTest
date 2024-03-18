@@ -1030,14 +1030,14 @@ namespace PopLottie
 			public Color	Colour;
 		}
 		
-		public void Render(TimeSpan PlayTime, Painter2D Painter,Rect ContentRect,bool EnableDebug)
+		public void Render(TimeSpan PlayTime, Painter2D Painter,Rect ContentRect,bool EnableDebug,ScaleMode scaleMode)
 		{
 			//	get the time, move it to lottie-anim space and loop it
 			var Frame = lottie.TimeToFrame(PlayTime,Looped:true);
-			Render( Frame, Painter, ContentRect, EnableDebug );
+			Render( Frame, Painter, ContentRect, EnableDebug, scaleMode );
 		}
 			
-		public void Render(FrameNumber Frame, Painter2D Painter,Rect ContentRect,bool EnableDebug)
+		public void Render(FrameNumber Frame, Painter2D Painter,Rect ContentRect,bool EnableDebug,ScaleMode scaleMode)
 		{
 			//Debug.Log($"Time = {Time.TotalSeconds} ({lottie.FirstKeyframe.TotalSeconds}...{lottie.LastKeyframe.TotalSeconds})");
 
@@ -1065,8 +1065,14 @@ namespace PopLottie
 			float ExtraScale = 1;	//	for debug zooming
 			var ScaleToCanvasWidth = (ContentRect.width / lottie.w)*ExtraScale;
 			var ScaleToCanvasHeight = (ContentRect.height / lottie.h)*ExtraScale;
-			bool Stretch = false;
-			bool FitHeight = true;
+			bool Stretch = scaleMode == ScaleMode.StretchToFill;
+			
+			//	todo: handle scale + crop (scale up)
+			//	todo: fit height or width, whichever is smaller
+			bool FitHeight = ScaleToCanvasHeight <= ScaleToCanvasWidth;
+			if ( scaleMode == ScaleMode.ScaleAndCrop )
+				FitHeight = !FitHeight;
+			
 			var ScaleToCanvasUniform = FitHeight ? ScaleToCanvasHeight : ScaleToCanvasWidth;
 			var ScaleToCanvas = Stretch ? new Vector2( ScaleToCanvasWidth, ScaleToCanvasHeight ) : new Vector2( ScaleToCanvasUniform, ScaleToCanvasUniform );
 			

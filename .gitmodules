@@ -1,0 +1,3 @@
+[submodule "LocalPackages/PopLottie"]
+	path = LocalPackages/PopLottie
+	url = https://github.com/NewChromantics/PopLottie.UnityPackage.git

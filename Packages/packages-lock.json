@@ -8,12 +8,13 @@
       "hash": "82e20a0008295f5fd1cc819c398a0e7a5bcfe731"
     },
     "com.newchromantics.poplottie": {
-      "version": "file:../LocalPackages/com.newchromantics.poplottie",
+      "version": "https://github.com/NewChromantics/PopLottie.UnityPackage.git",
       "depth": 0,
-      "source": "local",
+      "source": "git",
       "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.2.1"
-      }
+      },
+      "hash": "d23b79fcedd57614c468336a14cd7d9cde45b729"
     },
     "com.unity.2d.sprite": {
       "version": "1.0.0",

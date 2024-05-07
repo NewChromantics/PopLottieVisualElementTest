@@ -1,0 +1,5 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
+    <ui:VisualElement style="flex-grow: 1; flex-direction: row;">
+        <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="TestSquare_Static.lottie" enableDebug="true" name="LottieVisualElement" resourceFilename="Fruit.lottie.pretty" redrawIntervalMilliseconds="1000" enable-Debug="true" redraw-Interval-Milliseconds="10" resource-Filename="RectangleShape.lottie" scale-mode="ScaleToFit" style="background-color: rgba(188, 125, 13, 0.09); flex-grow: 1; display: flex; overflow: visible; -unity-background-image-tint-color: rgb(255, 255, 255);" />
+    </ui:VisualElement>
+</ui:UXML>

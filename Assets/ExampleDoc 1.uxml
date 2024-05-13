@@ -1,7 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
-    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="Fruit.lottie.pretty" animEnabled="true" name="AnimatedImageElement" style="flex-grow: 1; background-color: rgb(224, 45, 189);" />
-    <Studio5UI.AnimatedImageElement animatedImageResourceUrl="studio5logo" animEnabled="false" style="flex-grow: 1; background-color: rgba(224, 45, 189, 0); margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px;" />
-    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="studio5logo.pretty" enableDebug="true" style="background-color: rgb(8, 180, 195); flex-grow: 1; display: flex;" />
-    <PopLottie.LottieVisualElement animEnabled="true" animatedImageResourceUrl="Fruit.lottie.pretty" enableDebug="true" name="LottieVisualElement" style="background-color: rgba(188, 125, 13, 0.09); flex-grow: 1; display: flex;" />
-    <ui:VisualElement style="flex-grow: 0; background-image: url(&apos;project://database/Assets/studio5.svg?fileID=7388822144124034973&amp;guid=bb72e44389aea4e70952ed3de58c169c&amp;type=3#studio5&apos;); position: absolute; height: 82px; width: 305px; top: 147px; left: 45px; display: none;" />
-</ui:UXML>
